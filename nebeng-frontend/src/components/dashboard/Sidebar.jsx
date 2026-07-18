@@ -247,7 +247,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 					</button>
 				</div>
 
-				<style jsx>{`
+				<style>{`
 					.no-scrollbar::-webkit-scrollbar {
 						display: none;
 					}

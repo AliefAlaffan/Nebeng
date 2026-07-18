@@ -1,9 +1,10 @@
 import AppRouter from "./router/router";
 import { Toaster } from "react-hot-toast";
+import { UserProvider } from "./context/UserContext";
 
 function App() {
 	return (
-		<>
+		<UserProvider>
 			<Toaster
 				position="top-right"
 				toastOptions={{
@@ -11,7 +12,7 @@ function App() {
 				}}
 			/>
 			<AppRouter />
-		</>
+		</UserProvider>
 	);
 }
 

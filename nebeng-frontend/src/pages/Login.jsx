@@ -3,9 +3,11 @@ import InputField from "../components/ui/InputField";
 import logo from "../assets/logo.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LogIn, ShieldCheck, ArrowRight, Mail, Lock } from "lucide-react";
+import { useUser } from "../context/UserContext";
 
 function Login() {
 	const navigate = useNavigate();
+	const { refetchUser } = useUser();
 	const [showPassword, setShowPassword] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [formData, setFormData] = useState({ email: "", password: "" });
@@ -31,6 +33,10 @@ function Login() {
 				localStorage.setItem("token", data.token);
 				localStorage.setItem("role", data.user.role);
 				localStorage.setItem("user", JSON.stringify(data.user));
+
+				// Ambil ulang data profile (termasuk status verifikasi) sekarang
+				// token sudah tersimpan, supaya UserContext tidak basi.
+				await refetchUser();
 
 				if (data.status) {
 					const role = data.user.role;

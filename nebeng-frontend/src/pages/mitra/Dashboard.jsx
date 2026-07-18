@@ -252,7 +252,7 @@ export default function Dashboard() {
 						</div>
 
 						{/* CSS untuk menyembunyikan scrollbar */}
-						<style jsx>{`
+						<style>{`
 							.no-scrollbar::-webkit-scrollbar {
 								display: none;
 							}

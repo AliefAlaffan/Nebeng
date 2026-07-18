@@ -33,7 +33,7 @@ export default function AturPassword() {
 		try {
 			setIsLoading(true);
 
-			const response = await fetch("http://localhost:8000/api/update-password", {
+			const response = await fetch("http://127.0.0.1:8000/api/update-password", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",

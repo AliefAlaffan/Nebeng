@@ -134,7 +134,7 @@ export default function MitraSidebar({ sidebarOpen, setSidebarOpen }) {
 			</div>
 
 			{/* Style for no-scrollbar */}
-			<style jsx>{`
+			<style>{`
 				.no-scrollbar::-webkit-scrollbar {
 					display: none;
 				}

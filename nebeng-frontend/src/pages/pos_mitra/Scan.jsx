@@ -210,7 +210,7 @@ export default function Scan() {
 			</div>
 
 			{/* Custom Styling untuk Overwrite library html5-qrcode agar serasi */}
-			<style jsx global>{`
+			<style>{`
 				#reader {
 					border: none !important;
 				}

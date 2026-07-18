@@ -41,7 +41,6 @@ Route::post('/admin/unblock-user/{id}', [AdminController::class, 'unblockUser'])
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'me']);
-    Route::get('/profile',[ProfileController::class,'show']);
     Route::post('/profile/update',[ProfileController::class,'update']);
     Route::get('/check-pin', [PinController::class, 'checkPin']);
     Route::post('/update-pin', [PinController::class, 'updatePin']);

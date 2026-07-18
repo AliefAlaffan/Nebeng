@@ -17,7 +17,7 @@ export default function KonfirmasiPIN() {
 			try {
 				const token = localStorage.getItem("token");
 
-				const res = await fetch("http://localhost:8000/api/check-pin", {
+				const res = await fetch("http://127.0.0.1:8000/api/check-pin", {
 					headers: {
 						Authorization: `Bearer ${token}`,
 					},
@@ -60,7 +60,7 @@ export default function KonfirmasiPIN() {
 		try {
 			const token = localStorage.getItem("token");
 
-			const verifyRes = await fetch("http://localhost:8000/api/verify-pin", {
+			const verifyRes = await fetch("http://127.0.0.1:8000/api/verify-pin", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -209,7 +209,7 @@ export default function KonfirmasiPIN() {
 				</div>
 			</div>
 
-			<style jsx>{`
+			<style>{`
 				@keyframes shake {
 					0%,
 					100% {

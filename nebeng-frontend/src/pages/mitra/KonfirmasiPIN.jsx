@@ -251,7 +251,7 @@ export default function KonfirmasiPIN() {
 				</div>
 			</div>
 
-			<style jsx>{`
+			<style>{`
 				@keyframes shake {
 					0%,
 					100% {

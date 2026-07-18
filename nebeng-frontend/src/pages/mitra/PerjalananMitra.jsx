@@ -597,7 +597,7 @@ export default function PerjalananMitra() {
 			</div>
 
 			{/* Utility Styles */}
-			<style jsx>{`
+			<style>{`
 				.no-scrollbar::-webkit-scrollbar {
 					display: none;
 				}

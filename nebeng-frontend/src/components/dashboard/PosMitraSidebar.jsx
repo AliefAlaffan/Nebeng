@@ -161,7 +161,7 @@ export default function PosMitraSidebar() {
 			</div>
 
 			{/* CSS helper */}
-			<style jsx>{`
+			<style>{`
 				.no-scrollbar::-webkit-scrollbar {
 					display: none;
 				}

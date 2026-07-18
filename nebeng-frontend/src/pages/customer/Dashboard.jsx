@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
 import { Link } from "react-router-dom";
 import { Search, Bell, Star, ChevronRight, Bike, Car, XCircle, Package, Truck, Info } from "lucide-react";
+import { useUser } from "../../context/UserContext";
 
 const services = [
 	{ id: "motor", label: "Nebeng Motor", Icon: Bike, desc: "Cepat & gesit selip macet." },
@@ -11,14 +12,15 @@ const services = [
 ];
 
 export default function Dashboard() {
-	const [verificationLoading, setVerificationLoading] = useState(true);
+	const { user, loadingUser } = useUser();
+	const verificationLoading = loadingUser;
 	const [searchQuery, setSearchQuery] = useState("");
 	const [activePromo, setActivePromo] = useState(0);
 	const [rewardPoints, setRewardPoints] = useState(0);
 	const [recentActivities, setRecentActivities] = useState([]);
 
-	const [verificationStatus, setVerificationStatus] = useState("unverified");
 	const [showVerificationOverlay, setShowVerificationOverlay] = useState(true);
+	const verificationStatus = user?.status || "unverified";
 	const isVerified = verificationStatus === "verified";
 	const isPending = verificationStatus === "pending";
 	const isUnverified = verificationStatus === "unverified";
@@ -28,26 +30,6 @@ export default function Dashboard() {
 
 	// Filter layanan berdasarkan input pencarian secara realtime
 	const filteredServices = services.filter((s) => s.label.toLowerCase().includes(searchQuery.toLowerCase()));
-
-	// Check profile verification status on component mount
-	useEffect(() => {
-		const token = localStorage.getItem("token");
-
-		fetch("http://127.0.0.1:8000/api/profile", {
-			headers: {
-				Authorization: `Bearer ${token}`,
-				Accept: "application/json",
-			},
-		})
-			.then((res) => res.json())
-			.then((data) => {
-				setVerificationStatus(data.status || "unverified");
-			})
-			.catch((err) => console.error(err))
-			.finally(() => {
-				setVerificationLoading(false);
-			});
-	}, []);
 
 	const handleProtectedClick = (e) => {
 		if (!isVerified) {
@@ -292,7 +274,7 @@ export default function Dashboard() {
 						</div>
 
 						{/* Style tambahan untuk menyembunyikan scrollbar namun tetap bisa di-scroll */}
-						<style jsx>{`
+						<style>{`
 							.no-scrollbar::-webkit-scrollbar {
 								display: none;
 							}
@@ -430,7 +412,7 @@ export default function Dashboard() {
 				)}
 			</div>
 
-			<style jsx>{`
+			<style>{`
 				@keyframes shake {
 					0% {
 						transform: rotate(0deg);

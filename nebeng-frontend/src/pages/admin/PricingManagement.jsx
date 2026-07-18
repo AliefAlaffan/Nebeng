@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import AdminLayout from "../../components/dashboard/AdminLayout";
 import { Save, Settings, Truck, Package, Layers, Loader2, CheckCircle, Coins } from "lucide-react";
 import toast from "react-hot-toast";
-const API_URL = "http://localhost:8000/api";
+const API_URL = "http://127.0.0.1:8000/api";
 
 function PriceInput({ label, name, value, onChange, suffix = "Rp" }) {
 	return (
