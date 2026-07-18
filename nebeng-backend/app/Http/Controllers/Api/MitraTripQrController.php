@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
+use App\Models\Trip;
+use App\Models\TripQrSession;
+
+class MitraTripQrController extends Controller
+{
+    //
+    public function generate($tripId)
+    {
+        $trip = Trip::findOrFail($tripId);
+
+        // =========================
+        // CARI QR YANG MASIH AKTIF
+        // =========================
+        $existingSession = TripQrSession::where('trip_id', $trip->id)
+            ->where('is_used', false)
+            ->where('expired_at', '>', now())
+            ->where('purpose', 'arrival')
+            ->latest()
+            ->first();
+
+        // jika masih ada QR aktif
+        if ($existingSession) {
+
+            return response()->json([
+                'trip_id' => $trip->id,
+                'token' => $existingSession->token,
+                'expired_at' => $existingSession->expired_at,
+                'is_existing' => true,
+            ]);
+        }
+
+        // =========================
+        // GENERATE QR BARU
+        // =========================
+        $session = TripQrSession::create([
+            'trip_id' => $trip->id,
+            'token' => Str::random(40),
+             'purpose' => 'arrival',
+            'expired_at' => Carbon::now()->addHours(3),
+        ]);
+
+        return response()->json([
+            'trip_id' => $trip->id,
+            'token' => $session->token,
+            'expired_at' => $session->expired_at,
+            'is_existing' => false,
+        ]);
+    }
+
+    public function generateDepartureQr($tripId)
+    {
+        $trip = Trip::findOrFail($tripId);
+
+        if ($trip->status !== 'waiting_departure') {
+            return response()->json([
+                'message' => 'Trip belum siap diberangkatkan'
+            ], 400);
+        }
+
+        $existingSession = TripQrSession::where(
+                'trip_id',
+                $trip->id
+            )
+            ->where('purpose', 'departure')
+            ->where('is_used', false)
+            ->where('expired_at', '>', now())
+            ->latest()
+            ->first();
+
+        if ($existingSession) {
+            return response()->json([
+                'trip_id' => $trip->id,
+                'token' => $existingSession->token,
+                'purpose' => 'departure',
+                'expired_at' => $existingSession->expired_at,
+                'is_existing' => true,
+            ]);
+        }
+
+        $session = TripQrSession::create([
+            'trip_id' => $trip->id,
+            'token' => Str::random(40),
+            'purpose' => 'departure',
+            'expired_at' => now()->addHours(3),
+        ]);
+
+        return response()->json([
+            'trip_id' => $trip->id,
+            'token' => $session->token,
+            'purpose' => 'departure',
+            'expired_at' => $session->expired_at,
+            'is_existing' => false,
+        ]);
+    }
+}
