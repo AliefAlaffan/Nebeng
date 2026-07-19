@@ -167,6 +167,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // history HARUS di atas
         Route::get('/orders/history', [OrderController::class, 'history']);
 
+        // endpoint gabungan khusus dashboard (reward-points + 5 aktivitas terakhir)
+        Route::get('/dashboard-summary', [OrderController::class, 'dashboardSummary']);
+
         // detail order di bawah
         Route::get('/orders/{id}', [OrderController::class, 'show']);
 

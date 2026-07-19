@@ -57,27 +57,14 @@ export default function Dashboard() {
 		return () => clearInterval(timer);
 	}, []);
 
+	// Gabungan: reward points + 5 aktivitas terbaru dalam 1 request
+	// (sebelumnya ini 2 fetch terpisah ke endpoint berbeda)
 	useEffect(() => {
-		const token = localStorage.getItem("token");
-
-		fetch("http://127.0.0.1:8000/api/reward-points", {
-			headers: {
-				Authorization: `Bearer ${token}`,
-			},
-		})
-			.then((res) => res.json())
-			.then((data) => {
-				setRewardPoints(data.reward_points);
-			})
-			.catch((err) => console.error(err));
-	}, []);
-
-	useEffect(() => {
-		const fetchRecentActivities = async () => {
+		const fetchSummary = async () => {
 			try {
 				const token = localStorage.getItem("token");
 
-				const res = await fetch("http://127.0.0.1:8000/api/orders/history", {
+				const res = await fetch("http://127.0.0.1:8000/api/dashboard-summary", {
 					headers: {
 						Authorization: `Bearer ${token}`,
 						Accept: "application/json",
@@ -86,7 +73,9 @@ export default function Dashboard() {
 
 				const data = await res.json();
 
-				const formatted = data.map((order) => {
+				setRewardPoints(data.reward_points || 0);
+
+				const formatted = (data.recent_activities || []).map((order) => {
 					const vehicleType = order.trip?.vehicle_type || order.vehicle_type || order.type;
 
 					let type = vehicleType || "Perjalanan";
@@ -126,13 +115,13 @@ export default function Dashboard() {
 					};
 				});
 
-				setRecentActivities(formatted.slice(0, 5));
+				setRecentActivities(formatted);
 			} catch (err) {
 				console.error(err);
 			}
 		};
 
-		fetchRecentActivities();
+		fetchSummary();
 	}, []);
 
 	return (

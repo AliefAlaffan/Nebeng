@@ -156,4 +156,25 @@ class OrderController extends Controller
 
         return response()->json($orders);
     }
+
+    // Endpoint gabungan khusus dashboard: reward points + 5 aktivitas
+    // terbaru saja, jadi 1 request bukan 2, dan payload lebih ringan
+    // dari halaman Riwayat penuh.
+    public function dashboardSummary(Request $request)
+    {
+        $user = $request->user();
+
+        $recentOrders = Order::with([
+            'trip:id,vehicle_type,departure_date,departure_time,origin_point_id,destination_point_id',
+        ])
+        ->where('customer_id', $user->id)
+        ->latest()
+        ->limit(5)
+        ->get();
+
+        return response()->json([
+            'reward_points' => $user->reward_points,
+            'recent_activities' => $recentOrders,
+        ]);
+    }
 }
