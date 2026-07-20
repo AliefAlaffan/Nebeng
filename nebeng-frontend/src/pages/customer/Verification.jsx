@@ -1,14 +1,33 @@
 import React, { useState, useRef } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronRight, ChevronLeft, UploadCloud, CheckCircle2, Camera, FileText, UserCheck, Trash2, Loader2 } from "lucide-react";
+import CameraCapture from "../../components/verification/CameraCapture";
+import { ChevronRight, ChevronLeft, CheckCircle2, Camera, FileText, UserCheck, Trash2, Loader2, UploadCloud } from "lucide-react";
+
+// Konfigurasi kamera untuk masing-masing step foto data diri
+const CAMERA_CONFIG = {
+	ktp: { facingMode: "environment", guide: "card", title: "Foto KTP", description: "Letakkan KTP rata di dalam bingkai, hindari pantulan cahaya." },
+	face: { facingMode: "user", guide: "face", title: "Foto Wajah", description: "Posisikan wajah di dalam bingkai, pastikan pencahayaan cukup." },
+	selfie: { facingMode: "user", guide: "face", title: "Selfie dengan KTP", description: "Pegang KTP di bawah dagu, pastikan wajah & KTP terlihat jelas." },
+};
 
 export default function Verification() {
 	const [step, setStep] = useState(1);
 	const [files, setFiles] = useState({
-		face: null,
 		ktp: null,
+		face: null,
 		selfie: null,
 	});
+	const [cameraTarget, setCameraTarget] = useState(null); // "face" | "ktp" | "selfie" | null
+
+	// Khusus Foto KTP: boleh pilih dari galeri device, selain kamera
+	const ktpFileInputRef = useRef(null);
+	const handleKtpFileChange = (e) => {
+		const file = e.target.files[0];
+		if (file) {
+			setFiles((prev) => ({ ...prev, ktp: file }));
+		}
+	};
+
 	const [form, setForm] = useState({
 		full_name: "",
 		nik: "",
@@ -26,16 +45,10 @@ export default function Verification() {
 	const [loading, setLoading] = useState(false);
 	const [isSuccess, setIsSuccess] = useState(false);
 
-	// Refs untuk input file tersembunyi
-	const faceInputRef = useRef(null);
-	const ktpInputRef = useRef(null);
-	const selfieInputRef = useRef(null);
-
-	const handleFileChange = (e, type) => {
-		const file = e.target.files[0];
-		if (file) {
-			setFiles((prev) => ({ ...prev, [type]: file }));
-		}
+	const handleCameraCapture = (file) => {
+		if (!cameraTarget) return;
+		setFiles((prev) => ({ ...prev, [cameraTarget]: file }));
+		setCameraTarget(null);
 	};
 
 	const removeFile = (type) => {
@@ -70,8 +83,8 @@ export default function Verification() {
 			formData.append("address", form.address);
 
 			// ================= FILE =================
-			formData.append("face", files.face);
 			formData.append("ktp", files.ktp);
+			formData.append("face", files.face);
 			formData.append("selfie_ktp", files.selfie);
 
 			const res = await fetch("http://127.0.0.1:8000/api/verification", {
@@ -104,8 +117,8 @@ export default function Verification() {
 
 	const steps = [
 		{ id: 1, title: "Data Diri", icon: UserCheck },
-		{ id: 2, title: "Foto Wajah", icon: Camera },
-		{ id: 3, title: "Foto KTP", icon: FileText },
+		{ id: 2, title: "Foto KTP", icon: FileText },
+		{ id: 3, title: "Foto Wajah", icon: Camera },
 		{ id: 4, title: "Selfie KTP", icon: UserCheck },
 		{ id: 5, title: "Konfirmasi", icon: CheckCircle2 },
 	];
@@ -145,7 +158,7 @@ export default function Verification() {
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 								<InputField label="Nama Lengkap" name="full_name" value={form.full_name} onChange={handleInput} />
 
-								<InputField label="NIK" name="nik" value={form.nik} onChange={handleInput} />
+								<InputField label="NIK" name="nik" min="16" type="number" value={form.nik} onChange={handleInput} />
 
 								<InputField label="Tempat Lahir" name="birth_place" value={form.birth_place} onChange={handleInput} />
 
@@ -173,30 +186,30 @@ export default function Verification() {
 							</button>
 						</div>
 					)}
+
 					{step === 2 && (
 						<UploadStep
-							title="Foto Wajah"
-							desc="Pastikan wajah terlihat jelas tanpa masker atau kacamata hitam."
-							file={files.face}
-							onUpload={() => faceInputRef.current.click()}
-							onRemove={() => removeFile("face")}
-							inputRef={faceInputRef}
-							onChange={(e) => handleFileChange(e, "face")}
+							title="Foto KTP"
+							desc="Pastikan seluruh bagian KTP berada dalam bingkai dan tulisan terbaca."
+							file={files.ktp}
+							onUpload={() => setCameraTarget("ktp")}
+							onRemove={() => removeFile("ktp")}
 							onNext={() => setStep(3)}
+							onBack={() => setStep(1)}
+							allowGallery
+							galleryInputRef={ktpFileInputRef}
+							onGalleryChange={handleKtpFileChange}
 						/>
 					)}
 
 					{step === 3 && (
 						<UploadStep
-							title="Foto KTP"
-							desc="Pastikan seluruh bagian KTP berada dalam bingkai dan tulisan terbaca."
-							file={files.ktp}
-							onUpload={() => ktpInputRef.current.click()}
-							onRemove={() => removeFile("ktp")}
-							inputRef={ktpInputRef}
-							onChange={(e) => handleFileChange(e, "ktp")}
+							title="Foto Wajah"
+							desc="Pastikan wajah terlihat jelas tanpa masker atau kacamata hitam."
+							file={files.face}
+							onUpload={() => setCameraTarget("face")}
+							onRemove={() => removeFile("face")}
 							onNext={() => setStep(4)}
-							onBack={() => setStep(2)}
 						/>
 					)}
 
@@ -205,10 +218,8 @@ export default function Verification() {
 							title="Selfie dengan KTP"
 							desc="Pegang KTP di bawah dagu, pastikan wajah dan KTP tidak blur."
 							file={files.selfie}
-							onUpload={() => selfieInputRef.current.click()}
+							onUpload={() => setCameraTarget("selfie")}
 							onRemove={() => removeFile("selfie")}
-							inputRef={selfieInputRef}
-							onChange={(e) => handleFileChange(e, "selfie")}
 							onNext={() => setStep(5)}
 							onBack={() => setStep(3)}
 						/>
@@ -251,12 +262,23 @@ export default function Verification() {
 					)}
 				</div>
 			</div>
+
+			<CameraCapture
+				open={!!cameraTarget}
+				onClose={() => setCameraTarget(null)}
+				onCapture={handleCameraCapture}
+				facingMode={cameraTarget ? CAMERA_CONFIG[cameraTarget].facingMode : "user"}
+				guide={cameraTarget ? CAMERA_CONFIG[cameraTarget].guide : "none"}
+				title={cameraTarget ? CAMERA_CONFIG[cameraTarget].title : ""}
+				description={cameraTarget ? CAMERA_CONFIG[cameraTarget].description : ""}
+				watermarkText="Verifikasi Customer Nebeng"
+			/>
 		</CustomerLayout>
 	);
 }
 
 // Sub-komponen untuk efisiensi kode
-function UploadStep({ title, desc, file, onUpload, onRemove, inputRef, onChange, onNext, onBack }) {
+function UploadStep({ title, desc, file, onUpload, onRemove, onNext, onBack, allowGallery = false, galleryInputRef, onGalleryChange }) {
 	return (
 		<div className="animate-in slide-in-from-right-8 duration-300 text-center">
 			<h3 className="text-xl font-black text-gray-800 mb-2">{title}</h3>
@@ -284,14 +306,27 @@ function UploadStep({ title, desc, file, onUpload, onRemove, inputRef, onChange,
 				) : (
 					<>
 						<div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform">
-							<UploadCloud size={32} />
+							<Camera size={32} />
 						</div>
-						<p className="text-sm font-bold text-gray-500">Ketuk untuk pilih foto</p>
-						<p className="text-[10px] text-gray-400 mt-1">Format: JPG, PNG (Maks 5MB)</p>
+						<p className="text-sm font-bold text-gray-500">Ketuk untuk buka kamera</p>
+						<p className="text-[10px] text-gray-400 mt-1">Foto langsung dari kamera, bukan galeri</p>
 					</>
 				)}
 			</div>
-			<input type="file" ref={inputRef} onChange={onChange} className="hidden" accept="image/*" />
+
+			{/* Opsi tambahan khusus step ini: pilih foto dari galeri device */}
+			{allowGallery && !file && (
+				<>
+					<button
+						type="button"
+						onClick={() => galleryInputRef.current.click()}
+						className="mt-4 text-xs font-bold text-indigo-500 hover:text-indigo-700 underline underline-offset-2 flex items-center justify-center gap-1.5 mx-auto"
+					>
+						<UploadCloud size={14} /> atau pilih dari galeri
+					</button>
+					<input type="file" ref={galleryInputRef} onChange={onGalleryChange} className="hidden" accept="image/*" />
+				</>
+			)}
 
 			<div className="flex items-center gap-4 mt-10">
 				{onBack && (
