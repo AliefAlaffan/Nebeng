@@ -38,8 +38,8 @@ export default function Profile() {
 	];
 
 	const otherMenu = [
-		{ id: 8, label: "Keamanan", icon: ShieldCheck, color: "text-slate-700", bg: "bg-slate-100" },
-		{ id: 9, label: "Pusat Bantuan", icon: HelpCircle, color: "text-slate-700", bg: "bg-slate-100" },
+		{ id: 8, label: "Keamanan", icon: ShieldCheck, color: "text-slate-700", bg: "bg-slate-100", path: "/customer/keamanan" },
+		{ id: 9, label: "Pusat Bantuan", icon: HelpCircle, color: "text-slate-700", bg: "bg-slate-100", path: "/customer/pusat-bantuan" },
 	];
 
 	// ===============================
@@ -152,7 +152,7 @@ export default function Profile() {
 							<h3 className="text-xs font-black text-gray-300 uppercase tracking-[0.2em] mb-8">Lainnya</h3>
 							<div className="space-y-2">
 								{otherMenu.map((item) => (
-									<button key={item.id} className="w-full flex items-center justify-between p-4 rounded-3xl hover:bg-gray-50 transition-all group border border-transparent hover:border-gray-100">
+									<button key={item.id} onClick={() => item.path && navigate(item.path)} className="w-full flex items-center justify-between p-4 rounded-3xl hover:bg-gray-50 transition-all group border border-transparent hover:border-gray-100">
 										<div className="flex items-center gap-4">
 											<div className={`p-3 ${item.bg} ${item.color} rounded-2xl shadow-sm`}>
 												<item.icon size={20} />

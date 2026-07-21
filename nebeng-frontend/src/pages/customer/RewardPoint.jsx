@@ -1,9 +1,11 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { Search, Star, ChevronRight, PlusCircle, History, X, Bike, Car, Package } from "lucide-react";
+import { Search, Star, ChevronRight, ChevronLeft, PlusCircle, History, X, Bike, Car, Package } from "lucide-react";
 
 export default function RewardPoints() {
+	const navigate = useNavigate();
+	const rewardListRef = useRef(null);
 	const [points, setPoints] = useState(1000);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [, setHistory] = useState([]);
@@ -55,6 +57,14 @@ export default function RewardPoints() {
 	return (
 		<CustomerLayout>
 			<div className="w-full max-w-7xl mx-auto px-4 py-6 space-y-8 relative">
+				{/* HEADER & BACK */}
+				<div className="flex items-center gap-4">
+					<button onClick={() => navigate(-1)} className="p-2 bg-white rounded-xl shadow-sm border border-gray-100">
+						<ChevronLeft className="w-6 h-6 text-indigo-900" />
+					</button>
+					<h1 className="text-xl font-black text-indigo-900">Poin Hadiah</h1>
+				</div>
+
 				{/* POINT CARD SECTION */}
 				<div className="bg-white rounded-4xl p-8 shadow-sm border border-gray-100 overflow-hidden relative group">
 					<div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
@@ -162,10 +172,16 @@ export default function RewardPoints() {
 					</div>
 				</div>
 
-				<div className="space-y-6">
+				<div className="space-y-6" ref={rewardListRef}>
 					<div className="flex items-center justify-between">
 						<h3 className="text-lg font-black text-indigo-900 tracking-tight">Spesial Diskon Buat Kamu</h3>
-						<button className="flex items-center gap-1 text-xs font-black text-pink-500 hover:text-pink-600 transition-colors uppercase tracking-widest">
+						<button
+							onClick={() => {
+								setSearchQuery("");
+								rewardListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+							}}
+							className="flex items-center gap-1 text-xs font-black text-pink-500 hover:text-pink-600 transition-colors uppercase tracking-widest"
+						>
 							Lihat semua <ChevronRight size={14} />
 						</button>
 					</div>
