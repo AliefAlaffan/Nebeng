@@ -12,6 +12,7 @@ use App\Models\TripQrSession;
 use App\Models\PickupPoint;
 use App\Services\Maps\OSRMService;
 use App\Services\Pricing\TripPricingService;
+use App\Models\DriverBalance;
 
 class TripController extends Controller
 {
@@ -493,6 +494,65 @@ if ($request->tebengan_type === "Barang") {
         });
 
         return response()->json($trips);
+    }
+
+    public function dashboardSummary(Request $request)
+    {
+        $user = $request->user();
+
+        $balance = DriverBalance::firstOrCreate(
+            ['user_id' => $user->id],
+            ['balance' => 0]
+        );
+
+        $now = now();
+
+        $upcomingTrips = Trip::with([
+            'originPoint.city',
+            'destinationPoint.city'
+        ])
+        ->where('mitra_id', $user->id)
+        ->where('status', '!=', 'completed')
+        ->where(function ($q) use ($now) {
+            $q->where('departure_date', '>', $now->toDateString())
+            ->orWhere(function ($q2) use ($now) {
+                $q2->where('departure_date', '=', $now->toDateString())
+                    ->where('departure_time', '>=', $now->toTimeString());
+            });
+        })
+        ->orderBy('departure_date')
+        ->orderBy('departure_time')
+        ->limit(2)
+        ->get()
+        ->map(function ($trip) {
+            $rawStatus = $trip->status;
+
+            if ($rawStatus === 'cancelled') {
+                $status = 'Dibatalkan';
+            } elseif ($rawStatus === 'completed') {
+                $status = 'Selesai';
+            } else {
+                $status = 'Proses';
+            }
+
+            return [
+                'id' => $trip->id,
+                'vehicle_type' => $trip->vehicle_type,
+                'departure_date' => $trip->departure_date,
+                'departure_time' => $trip->departure_time,
+                'price' => $trip->price,
+                'status' => $status,
+                'seat_total' => $trip->seat_total,
+                'seat_available' => $trip->seat_available,
+                'origin_point' => $trip->originPoint,
+                'destination_point' => $trip->destinationPoint,
+            ];
+        });
+
+        return response()->json([
+            'balance' => $balance->balance,
+            'upcoming_trips' => $upcomingTrips,
+        ]);
     }
 
     public function posMitraTrips()

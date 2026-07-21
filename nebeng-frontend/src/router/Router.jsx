@@ -63,6 +63,8 @@ import TambahNebengBarang from "../pages/mitra/NebengBarang";
 import PesanMitra from "../pages/mitra/Pesan";
 import MitraProfile from "../pages/mitra/Profile";
 import MitraRiwayat from "../pages/mitra/Riwayat";
+import KeamananMitra from "../pages/mitra/Keamanan";
+import PusatBantuanMitra from "../pages/mitra/PusatBantuan";
 import StatusAkun from "../pages/mitra/StatusAkun";
 import Dokumen from "../pages/mitra/Dokumen";
 import EditProfileMitra from "../pages/mitra/EditProfile";
@@ -712,6 +714,24 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="mitra">
 						<StatusAkun />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/mitra/keamanan"
+				element={
+					<ProtectedRoute role="mitra">
+						<KeamananMitra />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/mitra/pusat-bantuan"
+				element={
+					<ProtectedRoute role="mitra">
+						<PusatBantuanMitra />
 					</ProtectedRoute>
 				}
 			/>

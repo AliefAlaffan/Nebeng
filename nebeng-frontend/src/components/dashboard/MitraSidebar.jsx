@@ -1,10 +1,10 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Home, Clock, MessageSquare, User, LogOut, X, Bike, ChevronRight, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useUser } from "../../context/UserContext";
 
 export default function MitraSidebar({ sidebarOpen, setSidebarOpen }) {
 	const navigate = useNavigate();
-	const [user, setUser] = useState(null);
+	const { user, clearUser } = useUser();
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
 
 	const mainMenus = [
@@ -13,24 +13,6 @@ export default function MitraSidebar({ sidebarOpen, setSidebarOpen }) {
 		{ name: "Pesan", path: "/mitra/pesan-mitra", icon: MessageSquare },
 		{ name: "Profil", path: "/mitra/profil", icon: User },
 	];
-	useEffect(() => {
-		const fetchProfile = async () => {
-			try {
-				const token = localStorage.getItem("token");
-				const res = await fetch("http://127.0.0.1:8000/api/profile", {
-					headers: {
-						Authorization: `Bearer ${token}`,
-						Accept: "application/json",
-					},
-				});
-				const data = await res.json();
-				setUser(data);
-			} catch (err) {
-				console.error("Profile error:", err);
-			}
-		};
-		fetchProfile();
-	}, []);
 
 	const handleLogout = async () => {
 		try {
@@ -43,6 +25,7 @@ export default function MitraSidebar({ sidebarOpen, setSidebarOpen }) {
 				},
 			});
 			localStorage.removeItem("token");
+			clearUser();
 			navigate("/login");
 		} catch (err) {
 			console.error("Logout error:", err);

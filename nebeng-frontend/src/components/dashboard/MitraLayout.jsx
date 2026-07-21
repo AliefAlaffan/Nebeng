@@ -3,13 +3,13 @@ import { useLocation, Link } from "react-router-dom";
 import MitraSidebar from "./MitraSidebar";
 import { Menu, Bell, Search, ChevronDown, Bike, X } from "lucide-react";
 import echo from "../../lib/echo";
+import { useUser } from "../../context/UserContext";
 
 export default function MitraLayout({ children }) {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [isScrolled] = useState(false);
 	const location = useLocation();
-	const [user, setUser] = useState(null);
-	const [loadingUser, setLoadingUser] = useState(true);
+	const { user, loadingUser } = useUser();
 	const [notifications, setNotifications] = useState([]);
 	const [hasNewNotif, setHasNewNotif] = useState(() => {
 		return localStorage.getItem("mitra_has_new_notif") === "true";
@@ -17,34 +17,6 @@ export default function MitraLayout({ children }) {
 	const [popupNotif, setPopupNotif] = useState(null);
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
 	const notificationSound = useRef(null);
-
-	// Efek shadow pada header saat di-scroll
-	useEffect(() => {
-		const fetchUser = async () => {
-			try {
-				const response = await fetch("http://127.0.0.1:8000/api/profile", {
-					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
-						Accept: "application/json",
-					},
-				});
-
-				if (!response.ok) {
-					throw new Error("Gagal mengambil data user");
-				}
-
-				const data = await response.json();
-
-				setUser(data);
-			} catch (error) {
-				console.error("Fetch user error:", error);
-			} finally {
-				setLoadingUser(false);
-			}
-		};
-
-		fetchUser();
-	}, []);
 
 	useEffect(() => {
 		console.log("LISTENING WEBSOCKET...");

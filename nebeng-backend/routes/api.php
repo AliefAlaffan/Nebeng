@@ -212,6 +212,9 @@ Route::middleware(['auth:sanctum','role:mitra'])->group(function () {
 
     Route::get('/mitra/trips', [TripController::class, 'myTrips']);
 
+
+    Route::get('/mitra/dashboard-summary', [TripController::class, 'dashboardSummary']);
+
 });
 
 Route::middleware(['auth:sanctum', 'role:pos_mitra'])->group(function () {

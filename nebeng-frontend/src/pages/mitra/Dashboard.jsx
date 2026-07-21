@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { Wallet, UserCheck, PlusCircle, Star, ChevronRight, Bike, Car, Package, Eye, EyeOff, XCircle, TrendingUp, ArrowUpRight, Clock, Calendar, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useUser } from "../../context/UserContext";
 
 const services = [
 	{ id: "motor", label: "Nebeng Motor", Icon: Bike, path: "/mitra/nebeng-motor" },
@@ -10,7 +11,8 @@ const services = [
 ];
 
 export default function Dashboard() {
-	const [verificationLoading, setVerificationLoading] = useState(true);
+	const { user, loadingUser } = useUser();
+	const verificationLoading = loadingUser;
 	const [showBalance, setShowBalance] = useState(true);
 	const [activePromo, setActivePromo] = useState(0);
 	const [balance, setBalance] = useState(0);
@@ -18,35 +20,11 @@ export default function Dashboard() {
 	const [upcomingTrips, setUpcomingTrips] = useState([]);
 	const [loadingTrips, setLoadingTrips] = useState(true);
 
-	const [verificationStatus, setVerificationStatus] = useState("unverified");
 	const [showVerificationOverlay, setShowVerificationOverlay] = useState(true);
+	const verificationStatus = user?.status || "unverified";
 	const isVerified = verificationStatus === "verified";
 	const isPending = verificationStatus === "pending";
 	const isUnverified = verificationStatus === "unverified";
-
-	// Check verifikasi status untuk fitur terbatas
-	useEffect(() => {
-		const fetchProfile = async () => {
-			try {
-				const res = await fetch("http://127.0.0.1:8000/api/profile", {
-					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
-						Accept: "application/json",
-					},
-				});
-
-				const data = await res.json();
-
-				setVerificationStatus(data.status || "unverified");
-			} catch (err) {
-				console.error("Gagal ambil profile:", err);
-			} finally {
-				setVerificationLoading(false);
-			}
-		};
-
-		fetchProfile();
-	}, []);
 
 	const handleProtectedClick = (e) => {
 		if (!isVerified) {
@@ -68,10 +46,14 @@ export default function Dashboard() {
 		return () => clearInterval(timer);
 	}, []);
 
+	// Gabungan: saldo + trip terdekat dalam 1 request
+	// (sebelumnya ini 2 fetch terpisah ke endpoint berbeda, dan
+	// /api/mitra/trips menarik SELURUH riwayat trip padahal cuma
+	// butuh 2 yang terdekat)
 	useEffect(() => {
-		const fetchBalance = async () => {
+		const fetchSummary = async () => {
 			try {
-				const res = await fetch("http://127.0.0.1:8000/api/balance", {
+				const res = await fetch("http://127.0.0.1:8000/api/mitra/dashboard-summary", {
 					headers: {
 						Authorization: `Bearer ${localStorage.getItem("token")}`,
 						Accept: "application/json",
@@ -81,53 +63,16 @@ export default function Dashboard() {
 				const data = await res.json();
 
 				setBalance(data.balance || 0);
+				setUpcomingTrips(data.upcoming_trips || []);
 			} catch (err) {
-				console.error("Gagal ambil saldo:", err);
+				console.error("Gagal ambil ringkasan dashboard:", err);
 			} finally {
 				setLoadingBalance(false);
-			}
-		};
-
-		fetchBalance();
-	}, []);
-
-	useEffect(() => {
-		const fetchTrips = async () => {
-			try {
-				const res = await fetch("http://127.0.0.1:8000/api/mitra/trips", {
-					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
-						Accept: "application/json",
-					},
-				});
-
-				const data = await res.json();
-
-				const now = new Date();
-
-				const filtered = data
-					.filter((trip) => {
-						const tripDate = new Date(`${trip.departure_date}T${trip.departure_time}`);
-
-						return tripDate >= now && trip.status.toLowerCase() !== "selesai";
-					})
-					.sort((a, b) => {
-						const dateA = new Date(`${a.departure_date}T${a.departure_time}`);
-						const dateB = new Date(`${b.departure_date}T${b.departure_time}`);
-
-						return dateA - dateB;
-					})
-					.slice(0, 2);
-
-				setUpcomingTrips(filtered);
-			} catch (error) {
-				console.error("Gagal ambil trip:", error);
-			} finally {
 				setLoadingTrips(false);
 			}
 		};
 
-		fetchTrips();
+		fetchSummary();
 	}, []);
 
 	const formatRupiah = (angka) => {
@@ -199,10 +144,6 @@ export default function Dashboard() {
 										Riwayat Saldo
 										<ChevronRight size={14} className="ml-1 group-hover:translate-x-1 transition-transform" />
 									</Link>
-									{/* <div className="text-right">
-										<p className="text-[9px] md:text-[10px] text-indigo-400 uppercase font-black leading-none mb-1">Total Orderan</p>
-										<p className="text-sm md:text-lg font-bold">12 Trip</p>
-									</div> */}
 								</div>
 							</div>
 
@@ -217,15 +158,6 @@ export default function Dashboard() {
 									<h3 className="font-black text-gray-800 text-lg md:text-xl tracking-tight leading-none">Layanan Mitra</h3>
 									<p className="text-[10px] md:text-sm text-gray-400 mt-1 uppercase font-bold tracking-widest">Kelola Kendaraan Anda</p>
 								</div>
-								{/* Tombol Tambah Kendaraan */}
-								{/* <button
-									onClick={(e) => handleProtectedClick(e)}
-									className={`flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-indigo-900 text-white rounded-xl text-[10px] md:text-sm font-black transition-all shadow-lg ${
-										!isVerified ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-800 active:scale-95"
-									}`}
-								>	
-									Tambah Kendaraan
-								</button> */}
 							</div>
 
 							{/* Container Scroll Menyamping di Mobile */}
@@ -238,9 +170,7 @@ export default function Dashboard() {
 										</div>
 
 										{/* Label Teks Sesuai Gambar */}
-										<div className="text-[11px] md:text-sm font-bold text-center mt-4 text-gray-700 leading-tight h-10 flex items-center justify-center max-w-[80px] md:max-w-full group-hover:text-indigo-900 transition-colors">
-											{s.label}
-										</div>
+										<div className="text-[11px] md:text-sm font-bold text-center mt-4 text-gray-700 leading-tight h-10 flex items-center justify-center max-w-[80px] md:max-w-full group-hover:text-indigo-900 transition-colors">{s.label}</div>
 
 										{/* Arrow Indikator (Desktop Only) */}
 										<div className="hidden md:flex mt-1 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0 bg-indigo-50 p-1 rounded-full text-indigo-900">
@@ -286,6 +216,7 @@ export default function Dashboard() {
 										<Link
 											to={`/mitra/detail-tebengan/${u.id}`}
 											onClick={handleProtectedClick}
+											key={u.id}
 											className={`block bg-gray-50 rounded-[2rem] p-5 border border-gray-100 transition-all cursor-pointer group ${
 												!isVerified ? "opacity-50 cursor-not-allowed" : "hover:border-indigo-200 hover:bg-white hover:shadow-xl hover:shadow-indigo-50/50"
 											}`}
