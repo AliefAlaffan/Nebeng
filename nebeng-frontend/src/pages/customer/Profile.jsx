@@ -34,7 +34,7 @@ export default function Profile() {
 		{ id: 5, label: "Atur PIN", icon: Lock, color: "text-slate-700", bg: "bg-slate-100", path: "/customer/atur-pin" },
 		// MENU BARU: Atur Password
 		{ id: 7, label: "Atur Password", icon: KeyRound, color: "text-purple-600", bg: "bg-purple-50", path: "/customer/atur-password" },
-		{ id: 6, label: "Alamat", icon: MapPin, color: "text-red-500", bg: "bg-red-50" },
+		{ id: 6, label: "Alamat", icon: MapPin, color: "text-red-500", bg: "bg-red-50", path: "/customer/alamat" },
 	];
 
 	const otherMenu = [

@@ -42,6 +42,7 @@ import Pembayaran from "../pages/customer/Pembayaran";
 import PembayaranSelesai from "../pages/customer/PembayaranSelesai";
 import RefundCustomer from "../pages/customer/Refund";
 import EditProfile from "../pages/customer/EditProfile";
+import Alamat from "../pages/customer/Alamat";
 import AturPIN from "../pages/customer/AturPIN";
 import AturPassword from "../pages/customer/AturPassword";
 import KonfirmasiPIN from "../pages/customer/KonfirmasiPIN";
@@ -373,6 +374,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="customer">
 						<EditProfile />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/customer/alamat"
+				element={
+					<ProtectedRoute role="customer">
+						<Alamat />
 					</ProtectedRoute>
 				}
 			/>
