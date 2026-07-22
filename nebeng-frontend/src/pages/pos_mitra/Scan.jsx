@@ -1,126 +1,170 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import PosMitraLayout from "../../components/dashboard/PosMitraLayout";
-import { ChevronLeft, CheckCircle2, XCircle, ScanLine, Loader2, RefreshCw } from "lucide-react";
-import { Html5QrcodeScanner, Html5Qrcode } from "html5-qrcode";
+import { ChevronLeft, CheckCircle2, XCircle, ScanLine, Loader2, RefreshCw, Camera, ImageUp } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
+
+const READER_ID = "reader";
 
 export default function Scan() {
-	const [scanResult, setScanResult] = useState(null);
+	const [cameraStatus, setCameraStatus] = useState("idle"); // idle | starting | active | denied
 	const [loading, setLoading] = useState(false);
-	const [scanType, setScanType] = useState(null);
 	const [success, setSuccess] = useState(false);
 	const [error, setError] = useState("");
-	const [scannerInstance, setScannerInstance] = useState(null);
 	const [successMessage, setSuccessMessage] = useState("");
 	const [successDescription, setSuccessDescription] = useState("");
+	const [scanResult, setScanResult] = useState(null);
 
-	const initScanner = () => {
-		setScanResult(null);
-		setSuccess(false);
-		setError("");
+	const html5QrCodeRef = useRef(null);
+	const fileInputRef = useRef(null);
 
-		const scanner = new Html5QrcodeScanner(
-			"reader",
-			{
-				qrbox: {
-					width: 250,
-					height: 250,
+	// ================= PROSES HASIL SCAN (kamera atau upload gambar) =================
+	const handleDecodedText = async (decodedText) => {
+		setScanResult(decodedText);
+
+		let parsedQR;
+
+		try {
+			parsedQR = JSON.parse(decodedText);
+		} catch {
+			setError("Format QR tidak valid");
+			return;
+		}
+
+		try {
+			setLoading(true);
+			setError("");
+
+			const token = localStorage.getItem("token");
+			let endpoint = "";
+
+			if (parsedQR.type === "departure") {
+				endpoint = "http://127.0.0.1:8000/api/pos-mitra/scan-departure-qr";
+			} else if (parsedQR.type === "trip") {
+				endpoint = "http://127.0.0.1:8000/api/pos-mitra/scan-qr";
+			} else if (parsedQR.type === "customer") {
+				endpoint = "http://127.0.0.1:8000/api/pos-mitra/scan-customer-qr";
+			} else {
+				throw new Error("Jenis QR tidak dikenali");
+			}
+
+			const response = await fetch(endpoint, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
 				},
-				fps: 10, // Ditingkatkan menjadi 10 agar tracking kamera lebih responsif
-			},
-			false,
-		);
+				body: JSON.stringify({ qr_token: parsedQR.token }),
+			});
 
-		scanner.render(
-			async (decodedText) => {
-				scanner.clear().catch((err) => console.error("Gagal clear scanner:", err));
-				setScanResult(decodedText);
+			const data = await response.json();
 
-				let parsedQR;
+			if (!response.ok) {
+				throw new Error(data.message || "Gagal memproses QR Token");
+			}
 
-				try {
-					parsedQR = JSON.parse(decodedText);
-				} catch {
-					throw new Error("Format QR tidak valid");
+			if (parsedQR.type === "customer") {
+				setSuccessMessage("Customer Berhasil Diverifikasi");
+				setSuccessDescription("Customer telah terverifikasi dan siap mengikuti perjalanan.");
+			} else if (parsedQR.type === "departure") {
+				setSuccessMessage("Perjalanan Berhasil Dimulai");
+				setSuccessDescription("QR keberangkatan berhasil diverifikasi. Status perjalanan telah berubah menjadi dalam perjalanan.");
+			} else if (parsedQR.type === "trip") {
+				setSuccessMessage("Trip Berhasil Diselesaikan");
+				setSuccessDescription("QR kedatangan berhasil diverifikasi. Status perjalanan telah diperbarui menjadi selesai.");
+			}
+
+			setSuccess(true);
+		} catch (err) {
+			setError(err.message);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	// ================= KAMERA =================
+	const stopCamera = async () => {
+		const instance = html5QrCodeRef.current;
+		if (instance) {
+			try {
+				const state = instance.getState?.();
+				if (state === 2 /* SCANNING */) {
+					await instance.stop();
 				}
+				await instance.clear();
+			} catch {
+				// kamera memang sudah tidak aktif, aman diabaikan
+			}
+		}
+		setCameraStatus("idle");
+	};
 
-				setScanType(parsedQR.type);
+	const startCamera = async () => {
+		setError("");
+		setSuccess(false);
+		setCameraStatus("starting");
 
-				try {
-					setLoading(true);
-					setError("");
+		try {
+			const html5QrCode = new Html5Qrcode(READER_ID);
+			html5QrCodeRef.current = html5QrCode;
 
-					const token = localStorage.getItem("token");
-					let endpoint = "";
+			await html5QrCode.start(
+				{ facingMode: "environment" },
+				{ fps: 10, qrbox: { width: 250, height: 250 } },
+				async (decodedText) => {
+					await stopCamera();
+					handleDecodedText(decodedText);
+				},
+				() => {
+					// frame tanpa QR terbaca, abaikan - ini normal, terjadi tiap frame
+				},
+			);
 
-					if (parsedQR.type === "departure") {
-						endpoint = "http://127.0.0.1:8000/api/pos-mitra/scan-departure-qr";
-					} else if (parsedQR.type === "trip") {
-						endpoint = "http://127.0.0.1:8000/api/pos-mitra/scan-qr";
-					} else if (parsedQR.type === "customer") {
-						endpoint = "http://127.0.0.1:8000/api/pos-mitra/scan-customer-qr";
-					} else {
-						throw new Error("Jenis QR tidak dikenali");
-					}
+			setCameraStatus("active");
+		} catch (err) {
+			console.error(err);
+			setCameraStatus("denied");
+			setError("Tidak bisa mengakses kamera. Pastikan izin kamera sudah diizinkan di browser, lalu coba lagi.");
+		}
+	};
 
-					const response = await fetch(endpoint, {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							Authorization: `Bearer ${token}`,
-						},
-						body: JSON.stringify({
-							qr_token: parsedQR.token,
-						}),
-					});
+	// ================= UPLOAD GAMBAR (1 klik, langsung proses) =================
+	const handleFileChange = async (e) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
 
-					const data = await response.json();
+		await stopCamera();
+		setError("");
+		setSuccess(false);
+		setLoading(true);
 
-					console.log("SCAN RESPONSE:", data);
+		try {
+			const html5QrCode = new Html5Qrcode(READER_ID);
+			const decodedText = await html5QrCode.scanFile(file, false);
+			await handleDecodedText(decodedText);
+		} catch (err) {
+			console.error(err);
+			setError("QR tidak terbaca dari gambar ini. Coba foto yang lebih jelas dan terang.");
+			setLoading(false);
+		} finally {
+			e.target.value = "";
+		}
+	};
 
-					if (!response.ok) {
-						throw new Error(data.message || "Gagal memproses QR Token");
-					}
-
-					if (parsedQR.type === "customer") {
-						setSuccessMessage("Customer Berhasil Diverifikasi");
-						setSuccessDescription("Customer telah terverifikasi dan siap mengikuti perjalanan.");
-					} else if (parsedQR.type === "departure") {
-						setSuccessMessage("Perjalanan Berhasil Dimulai");
-						setSuccessDescription("QR keberangkatan berhasil diverifikasi. Status perjalanan telah berubah menjadi dalam perjalanan.");
-					} else if (parsedQR.type === "trip") {
-						setSuccessMessage("Trip Berhasil Diselesaikan");
-						setSuccessDescription("QR kedatangan berhasil diverifikasi. Status perjalanan telah diperbarui menjadi selesai.");
-					}
-
-					setSuccess(true);
-
-					setSuccess(true);
-				} catch (err) {
-					setError(err.message);
-				} finally {
-					setLoading(false);
-				}
-			},
-			(errorMessage) => {
-				// Realtime match errors ignored
-			},
-		);
-
-		setScannerInstance(scanner);
+	const handleReset = async () => {
+		await stopCamera();
+		setError("");
+		setSuccess(false);
+		setScanResult(null);
 	};
 
 	useEffect(() => {
-		initScanner();
 		return () => {
-			if (scannerInstance) {
-				scannerInstance.clear().catch(() => {});
-			}
+			stopCamera();
 		};
 	}, []);
 
 	return (
 		<PosMitraLayout>
-			{/* Kontainer utama dengan padding-bottom aman agar tidak tertimpa bottom navigation */}
 			<div className="w-full max-w-screen-md mx-auto px-4 py-6 pb-32 md:pb-10 space-y-8 font-sans">
 				{/* HEADER NAVIGATION */}
 				<div className="flex items-center gap-4">
@@ -148,10 +192,42 @@ export default function Scan() {
 					</div>
 
 					{/* Area Kamera Viewfinder */}
-					<div className="overflow-hidden rounded-3xl border border-gray-100 bg-gray-900/5 relative">
-						<div id="reader" className="w-full h-full" />
+					<div className="overflow-hidden rounded-3xl border border-gray-100 bg-gray-900/5 relative min-h-[220px] flex items-center justify-center">
+						<div id={READER_ID} className="w-full" />
 
-						{/* Overlay State Loading */}
+						{/* State: belum aktifkan kamera sama sekali */}
+						{cameraStatus === "idle" && !success && (
+							<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+								<div className="p-4 bg-indigo-50 text-indigo-600 rounded-full">
+									<Camera size={32} />
+								</div>
+								<div className="space-y-4 w-full max-w-xs">
+									<button
+										onClick={startCamera}
+										className="w-full py-4 bg-indigo-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+									>
+										<Camera size={16} /> Aktifkan Kamera
+									</button>
+
+									<button
+										onClick={() => fileInputRef.current?.click()}
+										className="w-full py-3.5 bg-white border-2 border-gray-100 text-gray-600 rounded-2xl font-bold text-sm hover:bg-gray-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+									>
+										<ImageUp size={16} /> Upload Gambar QR
+									</button>
+								</div>
+							</div>
+						)}
+
+						{/* State: sedang minta izin kamera */}
+						{cameraStatus === "starting" && (
+							<div className="absolute inset-0 bg-white flex flex-col items-center justify-center gap-2 text-gray-500">
+								<Loader2 className="animate-spin" size={28} />
+								<p className="text-xs font-bold uppercase tracking-widest">Membuka kamera...</p>
+							</div>
+						)}
+
+						{/* Overlay State Loading (memproses hasil scan) */}
 						{loading && (
 							<div className="absolute inset-0 bg-indigo-950/40 backdrop-blur-xs flex flex-col items-center justify-center text-white z-20 animate-in fade-in duration-200">
 								<Loader2 className="animate-spin mb-3 text-sky-400" size={36} />
@@ -160,19 +236,37 @@ export default function Scan() {
 						)}
 					</div>
 
+					{/* Input file tersembunyi, dipicu oleh tombol "Upload Gambar QR" */}
+					<input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+					{/* Tombol ganti mode saat kamera sedang aktif */}
+					{cameraStatus === "active" && (
+						<button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-gray-50 text-gray-500 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-all flex items-center justify-center gap-2">
+							<ImageUp size={14} /> Atau upload gambar QR
+						</button>
+					)}
+
 					{/* FEEDBACK NOTIFIKASI STATUS */}
 
 					{/* Status Sukses */}
 					{success && (
-						<div className="flex items-start gap-4 bg-emerald-50 border border-emerald-100 rounded-2xl p-5 animate-in zoom-in-95 duration-300">
-							<div className="p-2 bg-white rounded-xl text-emerald-500 shadow-sm shrink-0">
-								<CheckCircle2 size={24} />
+						<div className="space-y-4 animate-in zoom-in-95 duration-300">
+							<div className="flex items-start gap-4 bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
+								<div className="p-2 bg-white rounded-xl text-emerald-500 shadow-sm shrink-0">
+									<CheckCircle2 size={24} />
+								</div>
+								<div className="space-y-0.5">
+									<p className="font-black text-emerald-800 text-sm uppercase tracking-wide">{successMessage}</p>
+									<p className="text-xs text-emerald-600 font-medium leading-relaxed">{successDescription}</p>
+								</div>
 							</div>
-							<div className="space-y-0.5">
-								<p className="font-black text-emerald-800 text-sm uppercase tracking-wide">{successMessage}</p>
 
-								<p className="text-xs text-emerald-600 font-medium leading-relaxed">{successDescription}</p>
-							</div>
+							<button
+								onClick={handleReset}
+								className="w-full py-4 bg-indigo-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+							>
+								<RefreshCw size={16} /> Scan Lagi
+							</button>
 						</div>
 					)}
 
@@ -189,9 +283,8 @@ export default function Scan() {
 								</div>
 							</div>
 
-							{/* Tombol Interaktif Ulangi jika Error */}
 							<button
-								onClick={initScanner}
+								onClick={handleReset}
 								className="w-full py-4 bg-indigo-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
 							>
 								<RefreshCw size={16} /> Scan Ulang Kembali
@@ -199,7 +292,7 @@ export default function Scan() {
 						</div>
 					)}
 
-					{/* Token Debug Data (Hanya muncul jika fungsionalitas debug diperlukan) */}
+					{/* Token Debug Data */}
 					{scanResult && !error && !loading && (
 						<div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-[10px] font-mono text-gray-400 break-all leading-tight">
 							<span className="font-black text-gray-500 uppercase block mb-1">Decoded Data String:</span>
@@ -209,59 +302,10 @@ export default function Scan() {
 				</div>
 			</div>
 
-			{/* Custom Styling untuk Overwrite library html5-qrcode agar serasi */}
 			<style>{`
-				#reader {
-					border: none !important;
-				}
-				#reader__dashboard_section_csr button {
-					background-color: #1e1b4b !important;
-					color: white !important;
-					padding: 0.5rem 1rem !important;
-					border-radius: 0.75rem !important;
-					font-weight: 800 !important;
-					font-size: 0.75rem !important;
-					text-transform: uppercase !important;
-					letter-spacing: 0.05em !important;
-					border: none !important;
-					transition: all 0.2s !important;
-				}
-				#reader__dashboard_section_csr button:hover {
-					background-color: #312e81 !important;
-				}
-				#reader__camera_permission_button {
-					background-color: #1e1b4b !important;
-					color: white !important;
-					padding: 0.75rem 1.5rem !important;
-					border-radius: 1rem !important;
-					font-weight: 900 !important;
-					text-transform: uppercase !important;
-					letter-spacing: 0.1em !important;
-					border: none !important;
-				}
-				#reader__scan_region {
+				#${READER_ID} video {
 					border-radius: 1.5rem !important;
-					overflow: hidden !important;
-				}
-
-				#reader__dashboard {
-					padding: 1rem !important;
-				}
-
-				#reader__dashboard_section {
-					display: flex !important;
-					flex-direction: column !important;
-					gap: 1rem !important;
-				}
-
-				#reader__dashboard_section_swaplink {
-					color: #4338ca !important;
-					font-weight: 800 !important;
-					font-size: 0.75rem !important;
-					text-transform: uppercase !important;
-					letter-spacing: 0.08em !important;
-					text-decoration: none !important;
-					cursor: pointer !important;
+					width: 100% !important;
 				}
 			`}</style>
 		</PosMitraLayout>

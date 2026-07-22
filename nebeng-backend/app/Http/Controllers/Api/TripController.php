@@ -496,6 +496,10 @@ if ($request->tebengan_type === "Barang") {
         return response()->json($trips);
     }
 
+    // Endpoint gabungan khusus dashboard mitra: saldo + 2 trip terdekat yang
+    // akan datang. Filter tanggal & limit dilakukan di query, bukan di
+    // frontend, supaya tidak perlu tarik seluruh riwayat trip tiap buka
+    // dashboard.
     public function dashboardSummary(Request $request)
     {
         $user = $request->user();
@@ -515,10 +519,10 @@ if ($request->tebengan_type === "Barang") {
         ->where('status', '!=', 'completed')
         ->where(function ($q) use ($now) {
             $q->where('departure_date', '>', $now->toDateString())
-            ->orWhere(function ($q2) use ($now) {
-                $q2->where('departure_date', '=', $now->toDateString())
-                    ->where('departure_time', '>=', $now->toTimeString());
-            });
+              ->orWhere(function ($q2) use ($now) {
+                  $q2->where('departure_date', '=', $now->toDateString())
+                     ->where('departure_time', '>=', $now->toTimeString());
+              });
         })
         ->orderBy('departure_date')
         ->orderBy('departure_time')
@@ -649,6 +653,16 @@ if ($request->tebengan_type === "Barang") {
         $session->trip->update([
             'status' => 'completed'
         ]);
+
+        // Ikut selesaikan semua order yang terkait trip ini, supaya
+        // riwayat pesanan customer ikut ter-update jadi "Selesai" -
+        // sebelumnya cuma status Trip yang di-update di sini, Order-nya
+        // kelewat, jadi customer lihat "Dalam Proses" terus walau
+        // trip-nya sudah beneran selesai.
+        foreach ($session->trip->orders as $order) {
+            $order->status = 'completed';
+            $order->save();
+        }
 
         return response()->json([
             'message' => 'Trip berhasil diselesaikan',
