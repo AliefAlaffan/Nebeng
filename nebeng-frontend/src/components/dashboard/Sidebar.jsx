@@ -194,9 +194,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 									Tarif Nebeng
 								</NavLink>
 
-								{/* <NavLink to="/admin/pengaturan/komisi" className={({ isActive }) => `py-2 ${isActive ? "text-sky-300 font-bold" : "text-white/60 hover:text-white"}`}>
-									Komisi Platform
-								</NavLink> */}
+								<NavLink to="/admin/pengaturan/pickup-point" className={({ isActive }) => `py-2 ${isActive ? "text-sky-300 font-bold" : "text-white/60 hover:text-white"}`}>
+									Pickup Point
+								</NavLink>
 							</div>
 						)}
 

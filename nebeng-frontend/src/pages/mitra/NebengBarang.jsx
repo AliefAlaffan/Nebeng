@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { ChevronLeft, MapPin, Calendar, Clock, ArrowRight, Navigation, X, CheckCircle2, Briefcase, ChevronDown } from "lucide-react";
@@ -7,8 +7,6 @@ export default function NebengBarang() {
 	const navigate = useNavigate();
 
 	// ================= STATE =================
-	const [origin, setOrigin] = useState("");
-	const [destination, setDestination] = useState("");
 	const [date, setDate] = useState("");
 	const [time, setTime] = useState("");
 	const [baggageCapacity, setBaggageCapacity] = useState("");
@@ -16,14 +14,10 @@ export default function NebengBarang() {
 	const [vehicleType, setVehicleType] = useState("");
 
 	const [pickupPoints, setPickupPoints] = useState([]);
-	const [filteredOrigin, setFilteredOrigin] = useState([]);
-	const [filteredDestination, setFilteredDestination] = useState([]);
+	const [loadingPoints, setLoadingPoints] = useState(true);
 
 	const [selectedOrigin, setSelectedOrigin] = useState(null);
 	const [selectedDestination, setSelectedDestination] = useState(null);
-
-	const [showOriginDropdown, setShowOriginDropdown] = useState(false);
-	const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
 
 	// ================= DATA OPTIONS =================
 	const baggageOptions = [
@@ -35,30 +29,12 @@ export default function NebengBarang() {
 	];
 
 	const vehicleOptions = [
-		{
-			id: "Barang-Motor",
-			label: "Motor",
-		},
-		{
-			id: "Barang-Mobil",
-			label: "Mobil",
-		},
-		{
-			id: "Barang-Bus",
-			label: "Bus",
-		},
-		{
-			id: "Barang-Kapal",
-			label: "Kapal",
-		},
-		{
-			id: "Barang-Pesawat",
-			label: "Pesawat",
-		},
-		{
-			id: "Barang-Kereta",
-			label: "Kereta",
-		},
+		{ id: "Barang-Motor", label: "Motor" },
+		{ id: "Barang-Mobil", label: "Mobil" },
+		{ id: "Barang-Bus", label: "Bus" },
+		{ id: "Barang-Kapal", label: "Kapal" },
+		{ id: "Barang-Pesawat", label: "Pesawat" },
+		{ id: "Barang-Kereta", label: "Kereta" },
 	];
 
 	const filteredBaggageOptions = baggageOptions.filter((option) => {
@@ -97,54 +73,22 @@ export default function NebengBarang() {
 				setPickupPoints(data);
 			} catch (err) {
 				console.error(err);
+			} finally {
+				setLoadingPoints(false);
 			}
 		};
 
 		fetchPickupPoints();
 	}, []);
 
-	const handleOriginChange = (e) => {
-		const value = e.target.value;
-		setOrigin(value);
-		setSelectedOrigin(null);
-
-		if (value.length > 0) {
-			const filtered = pickupPoints.filter((p) => {
-				const city = p.city?.toLowerCase() || "";
-				const pos = p.pos_name?.toLowerCase() || "";
-				const address = p.address?.toLowerCase() || "";
-
-				return city.includes(value.toLowerCase()) || pos.includes(value.toLowerCase()) || address.includes(value.toLowerCase());
-			});
-
-			setFilteredOrigin(filtered);
-			setShowOriginDropdown(true);
-			setShowDestinationDropdown(false);
-		} else {
-			setShowOriginDropdown(false);
-		}
+	const handleOriginSelect = (e) => {
+		const point = pickupPoints.find((p) => String(p.id) === e.target.value);
+		setSelectedOrigin(point || null);
 	};
 
-	const handleDestinationChange = (e) => {
-		const value = e.target.value;
-		setDestination(value);
-		setSelectedDestination(null);
-
-		if (value.length > 0) {
-			const filtered = pickupPoints.filter((p) => {
-				const city = p.city?.toLowerCase() || "";
-				const pos = p.pos_name?.toLowerCase() || "";
-				const address = p.address?.toLowerCase() || "";
-
-				return city.includes(value.toLowerCase()) || pos.includes(value.toLowerCase()) || address.includes(value.toLowerCase());
-			});
-
-			setFilteredDestination(filtered);
-			setShowDestinationDropdown(true);
-			setShowOriginDropdown(false);
-		} else {
-			setShowDestinationDropdown(false);
-		}
+	const handleDestinationSelect = (e) => {
+		const point = pickupPoints.find((p) => String(p.id) === e.target.value);
+		setSelectedDestination(point || null);
 	};
 
 	// ================= LOGIKA =================
@@ -212,39 +156,15 @@ export default function NebengBarang() {
 								</div>
 								<div className="flex-1 border-b border-gray-100">
 									<label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Lokasi Jemput Barang</label>
-									<input type="text" placeholder="Masukkan titik jemput" value={origin} onChange={handleOriginChange} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none" />
+									<select value={selectedOrigin?.id || ""} onChange={handleOriginSelect} disabled={loadingPoints} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none disabled:opacity-50">
+										<option value="">{loadingPoints ? "Memuat titik jemput..." : "Pilih titik jemput"}</option>
+										{pickupPoints.map((point) => (
+											<option key={point.id} value={point.id}>
+												{point.city} - {point.pos_name}
+											</option>
+										))}
+									</select>
 									{selectedOrigin && <p className="text-xs text-gray-400 mt-1">{selectedOrigin.address}</p>}
-									{showOriginDropdown && (
-										<div className="absolute left-0 right-0 bg-white border border-gray-100 rounded-2xl mt-2 shadow-xl max-h-64 overflow-y-auto z-50">
-											{filteredOrigin.map((point) => (
-												<button
-													key={point.id}
-													onClick={() => {
-														setOrigin(point.pos_name + " - " + point.city);
-														setSelectedOrigin(point);
-														setShowOriginDropdown(false);
-													}}
-													className="w-full flex items-start gap-3 text-left hover:bg-gray-50 transition border-gray-200 border-b last:border-none"
-												>
-													<div
-														key={point.id}
-														onClick={() => {
-															setSelectedOrigin(point);
-															setOrigin(`${point.city} - ${point.pos_name}`);
-															setShowOriginDropdown(false);
-														}}
-														className="p-4 hover:bg-gray-50 cursor-pointer border-b last:border-none border-gray-100"
-													>
-														<p className="text-sm font-bold text-gray-800">
-															{point.city} - {point.pos_name}
-														</p>
-
-														<p className="text-xs text-gray-400">{point.address}</p>
-													</div>
-												</button>
-											))}
-										</div>
-									)}
 								</div>
 							</div>
 
@@ -254,39 +174,15 @@ export default function NebengBarang() {
 								</div>
 								<div className="flex-1 border-b border-gray-100">
 									<label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Lokasi Antar Barang</label>
-									<input type="text" placeholder="Masukkan titik antar" value={destination} onChange={handleDestinationChange} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none" />
+									<select value={selectedDestination?.id || ""} onChange={handleDestinationSelect} disabled={loadingPoints} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none disabled:opacity-50">
+										<option value="">{loadingPoints ? "Memuat titik antar..." : "Pilih titik antar"}</option>
+										{pickupPoints.map((point) => (
+											<option key={point.id} value={point.id}>
+												{point.city} - {point.pos_name}
+											</option>
+										))}
+									</select>
 									{selectedDestination && <p className="text-xs text-gray-400 mt-1">{selectedDestination.address}</p>}
-									{showDestinationDropdown && (
-										<div className="absolute left-0 right-0 bg-white border border-gray-100 rounded-2xl mt-2 shadow-xl max-h-64 overflow-y-auto z-50">
-											{filteredDestination.map((point) => (
-												<button
-													key={point.id}
-													onClick={() => {
-														setDestination(point.pos_name + " - " + point.city);
-														setSelectedDestination(point);
-														setShowDestinationDropdown(false);
-													}}
-													className="w-full flex items-start gap-3 text-left hover:bg-gray-50 transition border-gray-200 border-b last:border-none"
-												>
-													<div
-														key={point.id}
-														onClick={() => {
-															setSelectedDestination(point);
-															setDestination(`${point.city} - ${point.pos_name}`);
-															setShowDestinationDropdown(false);
-														}}
-														className="p-4 hover:bg-gray-50 cursor-pointer border-b last:border-none border-gray-100"
-													>
-														<p className="text-sm font-bold text-gray-800">
-															{point.city} - {point.pos_name}
-														</p>
-
-														<p className="text-xs text-gray-400">{point.address}</p>
-													</div>
-												</button>
-											))}
-										</div>
-									)}
 								</div>
 							</div>
 						</div>

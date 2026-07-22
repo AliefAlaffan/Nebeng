@@ -24,6 +24,7 @@ import ProfileAdmin from "../pages/admin/Profile";
 import EditProfileAdmin from "../pages/admin/EditProfile";
 import AturPasswordAdmin from "../pages/customer/AturPassword";
 import AturHarga from "../pages/admin/PricingManagement";
+import PickupPointManagement from "../pages/admin/PickupPointManagement";
 
 /* CUSTOMER */
 import DashboardCustomer from "../pages/customer/Dashboard";
@@ -151,6 +152,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="admin">
 						<AturHarga />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/admin/pengaturan/pickup-point"
+				element={
+					<ProtectedRoute role="admin">
+						<PickupPointManagement />
 					</ProtectedRoute>
 				}
 			/>
