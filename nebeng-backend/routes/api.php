@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\TripJourneyController;
 use App\Http\Controllers\Api\TripReviewController;
 use App\Http\Controllers\Api\CustomerOrderQrController;
 use App\Http\Controllers\Api\AdminPricingController;
+use App\Http\Controllers\Api\AdminPickupPointController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -54,6 +55,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/admin/pricing',[AdminPricingController::class, 'index']);
 
     Route::put('/admin/pricing',[AdminPricingController::class, 'update']);
+
+    Route::get('/admin/pickup-points', [AdminPickupPointController::class, 'index']);
+    Route::get('/admin/cities', [AdminPickupPointController::class, 'cities']);
+    Route::post('/admin/pickup-points', [AdminPickupPointController::class, 'store']);
+    Route::put('/admin/pickup-points/{id}', [AdminPickupPointController::class, 'update']);
+    Route::delete('/admin/pickup-points/{id}', [AdminPickupPointController::class, 'destroy']);
 
 });
 
