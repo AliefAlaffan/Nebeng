@@ -14,9 +14,13 @@ class CustomerOrderQrController extends Controller
     {
         $order = Order::findOrFail($orderId);
 
-        if ($order->status !== 'completed') {
+        // QR dipakai buat check-in SEBELUM/SAAT boarding (di-scan POS Mitra),
+        // jadi tidak boleh disyaratkan trip sudah 'completed' - itu baru
+        // terjadi setelah perjalanan berakhir. Yang wajar menghalangi
+        // generate QR cuma order yang sudah dibatalkan.
+        if ($order->status === 'cancelled') {
             return response()->json([
-                'message' => 'Order belum dibayar'
+                'message' => 'Order ini sudah dibatalkan'
             ], 400);
         }
 

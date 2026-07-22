@@ -41,10 +41,14 @@ class OrderController extends Controller
             'drop_address' => $request->drop_address,
             'price' => $trip->price,
             'payment_method' => $request->payment_method, // 🔥 ini inti
-            'status' => 'completed'
+            'status' => 'waiting_departure'
         ]);
 
-        if ($order->payment_method !== 'cash' && $order->status === 'completed') {
+        // Untuk QRIS/e-wallet, pembayaran sudah lunas di muka saat checkout,
+        // jadi saldo mitra dicairkan sekarang. Ini terpisah dari status
+        // perjalanan (waiting_departure -> ... -> completed), yang hanya
+        // melacak progres fisik trip, bukan status pembayaran.
+        if ($order->payment_method !== 'cash') {
 
             $mitraId = $trip->mitra_id;
 
