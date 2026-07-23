@@ -13,8 +13,6 @@ use App\Models\PickupPoint;
 use App\Services\Maps\OSRMService;
 use App\Services\Pricing\TripPricingService;
 use App\Models\DriverBalance;
-use Carbon\Carbon;
-use Illuminate\Validation\ValidationException;
 
 class TripController extends Controller
 {
@@ -83,7 +81,7 @@ class TripController extends Controller
                 'destination_point_id' =>
                     'required|exists:pickup_points,id',
 
-                'departure_date' => 'required|date|after_or_equal:today',
+                'departure_date' => 'required|date',
 
                 'departure_time' => 'required',
 
@@ -100,19 +98,6 @@ class TripController extends Controller
                 'max_cap' =>
                     'nullable|integer|min:1',
             ]);
-
-            // ====================================
-            // VALIDASI: KEBERANGKATAN MINIMAL 3 JAM DARI SEKARANG
-            // ====================================
-            $departureAt = Carbon::parse(
-                $validated['departure_date'] . ' ' . $validated['departure_time']
-            );
-
-            if ($departureAt->lt(Carbon::now()->addHours(3))) {
-                throw ValidationException::withMessages([
-                    'departure_time' => 'Jadwal keberangkatan minimal 3 jam dari waktu sekarang.',
-                ]);
-            }
 
             // ====================================
             // AMBIL PICKUP POINT
@@ -392,16 +377,6 @@ if ($request->tebengan_type === "Barang") {
                 'trip' => $tripPassenger
 
             ]);
-
-        } catch (ValidationException $e) {
-
-            return response()->json([
-
-                'message' => collect($e->errors())->flatten()->first() ?? 'Data tidak valid',
-
-                'errors' => $e->errors(),
-
-            ], 422);
 
         } catch (\Exception $e) {
 
@@ -728,6 +703,17 @@ if ($request->tebengan_type === "Barang") {
             ], 400);
         }
 
+        // Lapis kedua: pastikan semua customer di trip ini sudah check-in
+        // sebelum benar-benar diberangkatkan (jaga-jaga kalau QR keberangkatan
+        // sempat ke-generate sebelum semua customer selesai scan).
+        $notReadyCount = $session->trip->orders()->where('readiness_status', '!=', 'ready')->count();
+
+        if ($notReadyCount > 0) {
+            return response()->json([
+                'message' => 'Masih ada customer yang belum check-in (scan QR) di Pos Mitra.'
+            ], 422);
+        }
+
         $session->update([
             'is_used' => true,
             'used_at' => now(),
@@ -783,6 +769,10 @@ if ($request->tebengan_type === "Barang") {
         $session->order->update([
             'readiness_status' => 'ready'
         ]);
+
+        // Broadcast realtime: layar customer & dashboard mitra ikut update
+        // otomatis tanpa perlu di-refresh manual
+        event(new \App\Events\CustomerReadyNotification($session->order->load(['trip', 'customer'])));
 
         return response()->json([
             'message' => 'Customer berhasil diverifikasi',

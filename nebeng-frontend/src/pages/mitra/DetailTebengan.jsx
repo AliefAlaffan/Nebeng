@@ -2,8 +2,9 @@ import React from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { ChevronLeft, MessageSquare, User, Phone, MapPin, Package, ReceiptText, Info, ArrowRight, Navigation } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import QRCode from "react-qr-code";
+import echo from "../../lib/echo";
 
 // Helper: return tailwind classes for status badge color
 function getStatusColor(status) {
@@ -26,23 +27,49 @@ export default function DetailTebenganMitra() {
 	const [qrData, setQrData] = useState(null);
 	const [showQR, setShowQR] = useState(false);
 
-	useEffect(() => {
-		const fetchTrip = async () => {
-			try {
-				const res = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}`);
-				const data = await res.json();
+	const fetchTrip = useCallback(async () => {
+		try {
+			const res = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}`);
+			const data = await res.json();
 
-				console.log("DATA TRIP:", data);
-				setTrip(data);
-			} catch (err) {
-				console.error(err);
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchTrip();
+			console.log("DATA TRIP:", data);
+			setTrip(data);
+		} catch (err) {
+			console.error(err);
+		} finally {
+			setLoading(false);
+		}
 	}, [tripId]);
+
+	useEffect(() => {
+		fetchTrip();
+	}, [fetchTrip]);
+
+	// ================= REALTIME: customer selesai discan POS Mitra =================
+	// Sebelumnya halaman ini harus di-refresh manual biar list order/customer
+	// update. Sekarang dengarkan event broadcast dari backend dan langsung
+	// fetch ulang data trip.
+	useEffect(() => {
+		const storedUser = localStorage.getItem("user");
+		const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+		const userId = parsedUser?.id;
+
+		if (!userId) return;
+
+		const channel = echo.private(`mitra.${userId}`);
+
+		channel.listen(".customer-ready", (e) => {
+			console.log("CUSTOMER READY EVENT:", e);
+
+			if (String(e.trip_id) === String(tripId)) {
+				fetchTrip();
+			}
+		});
+
+		return () => {
+			channel.stopListening(".customer-ready");
+		};
+	}, [tripId, fetchTrip]);
 
 	if (loading) {
 		return (

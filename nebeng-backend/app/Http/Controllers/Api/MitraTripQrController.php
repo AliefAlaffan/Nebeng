@@ -72,6 +72,18 @@ class MitraTripQrController extends Controller
             ], 422);
         }
 
+        // Customer harus sudah scan QR check-in di Pos Mitra (readiness_status
+        // = 'ready') dulu sebelum mitra boleh berangkat. Sebelumnya di sini
+        // cuma dicek ada order-nya atau tidak, tidak dicek apakah
+        // customer-nya beneran sudah hadir di pos.
+        $notReadyCount = $trip->orders->where('readiness_status', '!=', 'ready')->count();
+
+        if ($notReadyCount > 0) {
+            return response()->json([
+                'message' => 'Masih ada customer yang belum check-in (scan QR) di Pos Mitra.'
+            ], 422);
+        }
+
         $existingSession = TripQrSession::where(
                 'trip_id',
                 $trip->id

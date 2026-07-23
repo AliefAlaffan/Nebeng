@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { MapPin, MessageCircle, ChevronLeft, Navigation, CheckCircle2, Clock3, ChevronUp, ChevronDown, Milestone, Maximize2, Crosshair } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import QRCode from "react-qr-code";
+import echo from "../../lib/echo";
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -141,73 +142,101 @@ export default function PerjalananMitra() {
 	const [currentPosition, setCurrentPosition] = useState(null);
 	const [activeRoute, setActiveRoute] = useState([]);
 
-	useEffect(() => {
-		const fetchJourney = async () => {
-			try {
-				const response = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}`);
+	const fetchJourney = useCallback(async () => {
+		try {
+			const response = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}`);
 
-				const data = await response.json();
+			const data = await response.json();
 
-				console.log("JOURNEY:", data);
+			console.log("JOURNEY:", data);
 
-				setTrip(data);
+			setTrip(data);
 
-				setTripStatus(data.status);
+			setTripStatus(data.status);
 
-				setOriginPoint({
-					name: data.origin_point.pos_name,
-					address: data.origin_point.address,
-					coords: [Number(data.origin_point.latitude), Number(data.origin_point.longitude)],
-				});
+			setOriginPoint({
+				name: data.origin_point.pos_name,
+				address: data.origin_point.address,
+				coords: [Number(data.origin_point.latitude), Number(data.origin_point.longitude)],
+			});
 
-				setDestinationPoint({
-					name: data.destination_point.pos_name,
-					address: data.destination_point.address,
-					coords: [Number(data.destination_point.latitude), Number(data.destination_point.longitude)],
-				});
+			setDestinationPoint({
+				name: data.destination_point.pos_name,
+				address: data.destination_point.address,
+				coords: [Number(data.destination_point.latitude), Number(data.destination_point.longitude)],
+			});
 
-				// CUSTOMER PERTAMA
-				if (data.orders?.length > 0) {
-					const formattedCustomers = data.orders.map((order) => ({
-						id: order.user?.id,
-						name: order.user?.name || `Customer #${order.customer_id}`,
+			// CUSTOMER PERTAMA
+			if (data.orders?.length > 0) {
+				const formattedCustomers = data.orders.map((order) => ({
+					id: order.user?.id,
+					name: order.user?.name || `Customer #${order.customer_id}`,
 
-						photo: order.user?.avatar ? `http://127.0.0.1:8000/storage/${order.user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.user?.name || "Customer"}`,
+					photo: order.user?.avatar ? `http://127.0.0.1:8000/storage/${order.user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.user?.name || "Customer"}`,
 
-						phone: order.user?.phone || "",
+					phone: order.user?.phone || "",
 
-						type: data.vehicle_type === "barang" ? "Pengirim Barang" : "Penumpang Perjalanan",
-					}));
+					type: data.vehicle_type === "barang" ? "Pengirim Barang" : "Penumpang Perjalanan",
 
-					setCustomers(formattedCustomers);
-				}
+					isReady: order.readiness_status === "ready",
+				}));
 
-				// GEOJSON ROUTE
-				if (data.route_geojson) {
-					const geo = typeof data.route_geojson === "string" ? JSON.parse(data.route_geojson) : data.route_geojson;
-
-					if (geo.coordinates) {
-						const formatted = geo.coordinates.map((coord) => [coord[1], coord[0]]);
-
-						setRoutePath(formatted);
-					}
-				}
-
-				// TRACKING TERBARU
-				if (data.latest_tracking) {
-					setCurrentPosition([Number(data.latest_tracking.latitude), Number(data.latest_tracking.longitude)]);
-				} else {
-					setCurrentPosition([Number(data.origin_point.latitude), Number(data.origin_point.longitude)]);
-				}
-			} catch (error) {
-				console.error(error);
-			} finally {
-				setLoading(false);
+				setCustomers(formattedCustomers);
 			}
-		};
 
-		fetchJourney();
+			// GEOJSON ROUTE
+			if (data.route_geojson) {
+				const geo = typeof data.route_geojson === "string" ? JSON.parse(data.route_geojson) : data.route_geojson;
+
+				if (geo.coordinates) {
+					const formatted = geo.coordinates.map((coord) => [coord[1], coord[0]]);
+
+					setRoutePath(formatted);
+				}
+			}
+
+			// TRACKING TERBARU
+			if (data.latest_tracking) {
+				setCurrentPosition([Number(data.latest_tracking.latitude), Number(data.latest_tracking.longitude)]);
+			} else {
+				setCurrentPosition([Number(data.origin_point.latitude), Number(data.origin_point.longitude)]);
+			}
+		} catch (error) {
+			console.error(error);
+		} finally {
+			setLoading(false);
+		}
 	}, [tripId]);
+
+	useEffect(() => {
+		fetchJourney();
+	}, [fetchJourney]);
+
+	// ================= REALTIME: customer selesai discan POS Mitra =================
+	// Sebelumnya di sini harus refresh manual biar "Customer Perjalanan"
+	// dan status "Siap Berangkat" update. Sekarang dengarkan event
+	// broadcast dari backend dan langsung fetch ulang data trip.
+	useEffect(() => {
+		const storedUser = localStorage.getItem("user");
+		const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+		const userId = parsedUser?.id;
+
+		if (!userId) return;
+
+		const channel = echo.private(`mitra.${userId}`);
+
+		channel.listen(".customer-ready", (e) => {
+			console.log("CUSTOMER READY EVENT:", e);
+
+			if (String(e.trip_id) === String(tripId)) {
+				fetchJourney();
+			}
+		});
+
+		return () => {
+			channel.stopListening(".customer-ready");
+		};
+	}, [tripId, fetchJourney]);
 
 	useEffect(() => {
 		const interval = setInterval(async () => {
@@ -551,17 +580,29 @@ export default function PerjalananMitra() {
 								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer memesan tebengan ini sebelum bisa berangkat.</p>
 							)}
 
+							{tripStatus === "waiting_departure" && customers.some((c) => !c.isReady) && (
+								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">
+									Masih ada customer yang belum check-in (scan QR) di Pos Mitra. Perjalanan belum bisa dimulai.
+								</p>
+							)}
+
 							<button
-								onClick={handleStatusAction}
-								disabled={tripStatus === "completed" || (tripStatus === "active" && customers.length === 0)}
-								className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] shadow-xl
-            ${tripStatus === "completed" ? "bg-emerald-500 shadow-emerald-100" : tripStatus === "active" && customers.length === 0 ? "bg-gray-300 shadow-none cursor-not-allowed" : "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"}
+								onClick={tripStatus === "completed" ? () => navigate("/mitra/dashboard") : handleStatusAction}
+								disabled={(tripStatus === "active" && customers.length === 0) || (tripStatus === "waiting_departure" && customers.some((c) => !c.isReady))}
+								className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 shadow-xl
+            ${
+				tripStatus === "completed"
+					? "bg-emerald-500 shadow-emerald-100 hover:bg-emerald-600 active:scale-[0.98]"
+					: (tripStatus === "active" && customers.length === 0) || (tripStatus === "waiting_departure" && customers.some((c) => !c.isReady))
+						? "bg-gray-300 shadow-none cursor-not-allowed"
+						: "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98]"
+			}
         `}
 							>
 								{tripStatus === "completed" ? (
 									<>
 										<CheckCircle2 size={18} />
-										Perjalanan Selesai
+										Kembali ke Beranda
 									</>
 								) : (
 									<>
@@ -570,6 +611,8 @@ export default function PerjalananMitra() {
 									</>
 								)}
 							</button>
+
+							{tripStatus === "completed" && customers.length > 0 && <p className="text-xs text-center font-semibold text-gray-400 -mt-1">Trip sudah selesai. Beri rating customer di bawah (opsional).</p>}
 
 							{/* BUTTON RATING CUSTOMER */}
 							{tripStatus === "completed" && customers.length > 0 && (

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
 import { ChevronLeft, MessageCircle, Navigation, Clock3, ChevronUp, ChevronDown, ShieldAlert, Car, MapPin, Crosshair } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import QRCode from "react-qr-code";
+import echo from "../../lib/echo";
 
 // ================= CUSTOM MAP ICONS =================
 const driverIcon = L.divIcon({
@@ -98,53 +99,80 @@ export default function PerjalananCustomer() {
 	// 	return () => clearTimeout(timer);
 	// }, []);
 
-	useEffect(() => {
-		const fetchTrip = async () => {
-			try {
-				const token = localStorage.getItem("token");
+	const fetchTrip = useCallback(async () => {
+		try {
+			const token = localStorage.getItem("token");
 
-				const res = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}/journey`, {
-					headers: {
-						Authorization: `Bearer ${token}`,
-						Accept: "application/json",
-					},
-				});
+			const res = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}/journey`, {
+				headers: {
+					Authorization: `Bearer ${token}`,
+					Accept: "application/json",
+				},
+			});
 
-				const data = await res.json();
+			const data = await res.json();
 
-				console.log("TRIP CUSTOMER:", data);
+			console.log("TRIP CUSTOMER:", data);
 
-				setTrip(data.trip);
+			setTrip(data.trip);
 
-				if (data.latest_tracking) {
-					setDriverPosition([Number(data.latest_tracking.latitude), Number(data.latest_tracking.longitude)]);
-				}
-
-				// sync status dari backend
-				if (data.trip.status === "waiting_departure") {
-					setTripStatus("waiting_departure");
-				}
-
-				if (data.trip.status === "on_the_way") {
-					setTripStatus("on_the_way");
-				}
-
-				if (data.trip.status === "arrived_destination") {
-					setTripStatus("arrived_destination");
-				}
-
-				if (data.trip.status === "completed") {
-					setTripStatus("completed");
-				}
-			} catch (err) {
-				console.error(err);
-			} finally {
-				setLoading(false);
+			if (data.latest_tracking) {
+				setDriverPosition([Number(data.latest_tracking.latitude), Number(data.latest_tracking.longitude)]);
 			}
-		};
 
-		fetchTrip();
+			// sync status dari backend
+			if (data.trip.status === "waiting_departure") {
+				setTripStatus("waiting_departure");
+			}
+
+			if (data.trip.status === "on_the_way") {
+				setTripStatus("on_the_way");
+			}
+
+			if (data.trip.status === "arrived_destination") {
+				setTripStatus("arrived_destination");
+			}
+
+			if (data.trip.status === "completed") {
+				setTripStatus("completed");
+			}
+		} catch (err) {
+			console.error(err);
+		} finally {
+			setLoading(false);
+		}
 	}, [tripId]);
+
+	useEffect(() => {
+		fetchTrip();
+	}, [fetchTrip]);
+
+	// ================= REALTIME: QR sudah discan POS Mitra =================
+	// Sebelumnya harus refresh manual biar modal QR berubah jadi "sudah
+	// siap". Sekarang dengarkan event broadcast dari backend, fetch ulang
+	// data trip, dan otomatis tutup modal QR karena sudah tidak diperlukan.
+	useEffect(() => {
+		const storedUser = localStorage.getItem("user");
+		const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+		const userId = parsedUser?.id;
+
+		if (!userId) return;
+
+		const channel = echo.private(`customer.${userId}`);
+
+		channel.listen(".customer-ready", (e) => {
+			console.log("CUSTOMER READY EVENT:", e);
+
+			if (String(e.trip_id) === String(tripId)) {
+				fetchTrip();
+				setShowQR(false);
+			}
+		});
+
+		return () => {
+			channel.stopListening(".customer-ready");
+		};
+	}, [tripId, fetchTrip]);
 
 	const handleGenerateQR = async () => {
 		try {
