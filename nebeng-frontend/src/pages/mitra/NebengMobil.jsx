@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { ChevronLeft, MapPin, Calendar, Clock, Users, ArrowRight, Navigation, X, CheckCircle2, Briefcase, ChevronDown } from "lucide-react";
+import { getMinDateValue, getMinTimeValue, validateDepartureSchedule } from "../../utils/scheduleValidation";
 
 export default function TambahNebeng() {
 	const navigate = useNavigate();
@@ -38,6 +39,10 @@ export default function TambahNebeng() {
 
 	const selectedBaggageLabel = filteredBaggageOptions.find((opt) => opt.id === baggageCapacity)?.label || "Pilih Kapasitas";
 
+	// Dihitung ulang setiap render supaya selalu mengacu ke waktu terkini.
+	const scheduleCheck = date && time ? validateDepartureSchedule(date, time) : { valid: true };
+	const scheduleError = date && time && !scheduleCheck.valid ? scheduleCheck.message : null;
+
 	const handleOriginSelect = (e) => {
 		const point = pickupPoints.find((p) => String(p.id) === e.target.value);
 		setSelectedOrigin(point || null);
@@ -51,6 +56,12 @@ export default function TambahNebeng() {
 	const handleNext = () => {
 		if (!selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount) {
 			alert("Mohon lengkapi semua data perjalanan");
+			return;
+		}
+
+		const scheduleCheck = validateDepartureSchedule(date, time);
+		if (!scheduleCheck.valid) {
+			alert(scheduleCheck.message);
 			return;
 		}
 
@@ -145,17 +156,40 @@ export default function TambahNebeng() {
 							<div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-900 flex items-center justify-center shrink-0"><Calendar size={24} /></div>
 							<div className="flex-1">
 								<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal</p>
-								<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-transparent font-black text-indigo-900 outline-none w-full" />
+								<input
+									type="date"
+									value={date}
+									min={getMinDateValue()}
+									onChange={(e) => {
+										setDate(e.target.value);
+										// reset jam kalau jam yang sudah dipilih jadi tidak valid lagi untuk tanggal baru
+										const minTime = getMinTimeValue(e.target.value);
+										if (minTime && time && time < minTime) {
+											setTime("");
+										}
+									}}
+									className="bg-transparent font-black text-indigo-900 outline-none w-full"
+								/>
 							</div>
 						</div>
 						<div className="bg-white p-6 rounded-3xl border border-gray-100 flex items-center gap-4">
 							<div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-900 flex items-center justify-center shrink-0"><Clock size={24} /></div>
 							<div className="flex-1">
 								<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Jam</p>
-								<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="bg-transparent font-black text-indigo-900 outline-none w-full" />
+								<input
+									type="time"
+									value={time}
+									min={getMinTimeValue(date)}
+									onChange={(e) => setTime(e.target.value)}
+									className="bg-transparent font-black text-indigo-900 outline-none w-full"
+								/>
 							</div>
 						</div>
 					</div>
+
+					{scheduleError && (
+						<p className="text-xs font-bold text-red-500 -mt-2 px-2">{scheduleError}</p>
+					)}
 
 					<button onClick={() => setShowTypeModal(true)} className="w-full bg-white p-6 rounded-3xl border border-gray-100 flex items-center justify-between group hover:bg-gray-50 transition-all">
 						<div className="flex items-center gap-4 text-left">
@@ -193,7 +227,7 @@ export default function TambahNebeng() {
 						</div>
 					)}
 
-					<button onClick={handleNext} className="w-full bg-indigo-900 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98]">
+					<button onClick={handleNext} disabled={!selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount || !!scheduleError} className="w-full bg-indigo-900 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-900">
 						Selanjutnya <ArrowRight size={24} />
 					</button>
 				</div>

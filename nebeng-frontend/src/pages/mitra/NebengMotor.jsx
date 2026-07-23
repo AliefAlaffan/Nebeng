@@ -1,35 +1,28 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { ChevronLeft, MapPin, Calendar, Clock, Users, ArrowRight, Navigation, X, CheckCircle2, Briefcase, ChevronDown } from "lucide-react";
+import { getMinDateValue, getMinTimeValue, validateDepartureSchedule } from "../../utils/scheduleValidation";
 
 export default function TambahNebeng() {
 	const navigate = useNavigate();
 
 	// ================= STATE =================
-	const [origin, setOrigin] = useState("");
-	const [destination, setDestination] = useState("");
 	const [date, setDate] = useState("");
+	const [time, setTime] = useState("");
 
 	const [pickupPoints, setPickupPoints] = useState([]);
-	const [showOriginDropdown, setShowOriginDropdown] = useState(false);
-	const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
-
-	const [filteredOrigin, setFilteredOrigin] = useState([]);
-	const [filteredDestination, setFilteredDestination] = useState([]);
+	const [loadingPoints, setLoadingPoints] = useState(true);
 
 	const [selectedOrigin, setSelectedOrigin] = useState(null);
 	const [selectedDestination, setSelectedDestination] = useState(null);
-	const [time, setTime] = useState("");
+
 	const [tebenganType, setTebenganType] = useState("");
 	const [seatCount, setSeatCount] = useState("1");
 	const [baggageCapacity, setBaggageCapacity] = useState("");
 
 	const [showTypeModal, setShowTypeModal] = useState(false);
 	const [showBaggageModal, setShowBaggageModal] = useState(false);
-
-	const originRef = useRef(null);
-	const destinationRef = useRef(null);
 
 	// ================= DATA OPTIONS =================
 	const typeOptions = [
@@ -50,9 +43,45 @@ export default function TambahNebeng() {
 		return ["xxs", "xs", "kecil"].includes(option.id);
 	});
 
+	const selectedBaggageLabel = filteredBaggageOptions.find((opt) => opt.id === baggageCapacity)?.label || "Pilih Kapasitas";
+
+	// ================= LOKASI (DROPDOWN) =================
+	const handleOriginSelect = (e) => {
+		const point = pickupPoints.find((p) => String(p.id) === e.target.value);
+		setSelectedOrigin(point || null);
+	};
+
+	const handleDestinationSelect = (e) => {
+		const point = pickupPoints.find((p) => String(p.id) === e.target.value);
+		setSelectedDestination(point || null);
+	};
+
+	// ================= JADWAL (VALIDASI LIVE) =================
+	// Dihitung ulang setiap render supaya selalu mengacu ke waktu terkini.
+	const scheduleCheck = date && time ? validateDepartureSchedule(date, time) : { valid: true };
+	const scheduleError = date && time && !scheduleCheck.valid ? scheduleCheck.message : null;
+
+	const handleDateChange = (e) => {
+		const newDate = e.target.value;
+		setDate(newDate);
+
+		// reset jam kalau jam yang sudah dipilih jadi tidak valid lagi untuk tanggal baru
+		const minTime = getMinTimeValue(newDate);
+		if (minTime && time && time < minTime) {
+			setTime("");
+		}
+	};
+
+	// ================= SUBMIT =================
 	const handleNext = () => {
 		if (!selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount) {
 			alert("Mohon lengkapi semua data perjalanan");
+			return;
+		}
+
+		const check = validateDepartureSchedule(date, time);
+		if (!check.valid) {
+			alert(check.message);
 			return;
 		}
 
@@ -83,83 +112,22 @@ export default function TambahNebeng() {
 		});
 	};
 
-	const handleOriginChange = (e) => {
-		const value = e.target.value;
-		setOrigin(value);
-		setSelectedOrigin(null);
-
-		if (value.length > 0) {
-			const filtered = pickupPoints.filter((p) => {
-				const city = p.city?.toLowerCase() || "";
-				const pos = p.pos_name?.toLowerCase() || "";
-				const address = p.address?.toLowerCase() || "";
-
-				return city.includes(value.toLowerCase()) || pos.includes(value.toLowerCase()) || address.includes(value.toLowerCase());
-			});
-
-			setFilteredOrigin(filtered);
-			setShowOriginDropdown(true);
-			setShowDestinationDropdown(false);
-		} else {
-			setShowOriginDropdown(false);
-		}
-	};
-
-	const selectedBaggageLabel = filteredBaggageOptions.find((opt) => opt.id === baggageCapacity)?.label || "Pilih Kapasitas";
-
-	const handleDestinationChange = (e) => {
-		const value = e.target.value;
-		setDestination(value);
-		setSelectedDestination(null);
-
-		if (value.length > 0) {
-			const filtered = pickupPoints.filter((p) => {
-				const city = p.city?.toLowerCase() || "";
-				const pos = p.pos_name?.toLowerCase() || "";
-				const address = p.address?.toLowerCase() || "";
-
-				return city.includes(value.toLowerCase()) || pos.includes(value.toLowerCase()) || address.includes(value.toLowerCase());
-			});
-
-			setFilteredDestination(filtered);
-			setShowDestinationDropdown(true);
-			setShowOriginDropdown(false);
-		} else {
-			setShowDestinationDropdown(false);
-		}
-	};
-
 	useEffect(() => {
 		const fetchPickupPoints = async () => {
 			try {
 				const res = await fetch("http://127.0.0.1:8000/api/pickup-points");
-				const data = await res.json();
-				setPickupPoints(data);
+				setPickupPoints(await res.json());
 			} catch (err) {
 				console.error(err);
+			} finally {
+				setLoadingPoints(false);
 			}
 		};
 
 		fetchPickupPoints();
 	}, []);
 
-	useEffect(() => {
-		const handleClickOutside = (e) => {
-			if (originRef.current && !originRef.current.contains(e.target)) {
-				setShowOriginDropdown(false);
-			}
-
-			if (destinationRef.current && !destinationRef.current.contains(e.target)) {
-				setShowDestinationDropdown(false);
-			}
-		};
-
-		document.addEventListener("mousedown", handleClickOutside);
-
-		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
-		};
-	}, []);
+	const isNextDisabled = !selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount || !!scheduleError;
 
 	return (
 		<MitraLayout>
@@ -180,82 +148,30 @@ export default function TambahNebeng() {
 								<div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-100">
 									<Navigation size={20} className="transform rotate-45" />
 								</div>
-								<div ref={originRef} className="flex-1 border-b border-gray-100 relative">
+								<div className="flex-1 border-b border-gray-100 relative">
 									<label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Lokasi Awal</label>
-									<input type="text" placeholder="Masukkan titik jemput" value={origin} onChange={handleOriginChange} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none" />
+									<select value={selectedOrigin?.id || ""} onChange={handleOriginSelect} disabled={loadingPoints} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none disabled:opacity-50">
+										<option value="">{loadingPoints ? "Memuat titik jemput..." : "Pilih titik jemput"}</option>
+										{pickupPoints.map((point) => (
+											<option key={point.id} value={point.id}>{point.city} - {point.pos_name}</option>
+										))}
+									</select>
 									{selectedOrigin && <p className="text-xs text-gray-400 mt-1">{selectedOrigin.address}</p>}
-									{showOriginDropdown && (
-										<div className="absolute left-0 right-0 bg-white border border-gray-100 rounded-2xl mt-2 shadow-xl max-h-64 overflow-y-auto z-50">
-											{filteredOrigin.map((point) => (
-												<button
-													key={point.id}
-													onClick={() => {
-														setOrigin(point.pos_name + " - " + point.city);
-														setSelectedOrigin(point);
-														setShowOriginDropdown(false);
-													}}
-													className="w-full flex items-start gap-3 text-left hover:bg-gray-50 transition border-gray-200 border-b last:border-none"
-												>
-													<div
-														key={point.id}
-														onClick={() => {
-															setSelectedOrigin(point);
-															setOrigin(`${point.city} - ${point.pos_name}`);
-															setShowOriginDropdown(false);
-														}}
-														className="p-4 hover:bg-gray-50 cursor-pointer border-b last:border-none border-gray-100"
-													>
-														<p className="text-sm font-bold text-gray-800">
-															{point.city} - {point.pos_name}
-														</p>
-
-														<p className="text-xs text-gray-400">{point.address}</p>
-													</div>
-												</button>
-											))}
-										</div>
-									)}
 								</div>
 							</div>
 							<div className="flex items-center gap-4 relative z-9">
 								<div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-orange-100">
 									<MapPin size={20} />
 								</div>
-								<div ref={destinationRef} className="flex-1 border-b border-gray-100 relative">
+								<div className="flex-1 border-b border-gray-100 relative">
 									<label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Lokasi Tujuan</label>
-									<input type="text" placeholder="Masukkan titik tujuan" value={destination} onChange={handleDestinationChange} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none" />
+									<select value={selectedDestination?.id || ""} onChange={handleDestinationSelect} disabled={loadingPoints} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none disabled:opacity-50">
+										<option value="">{loadingPoints ? "Memuat titik tujuan..." : "Pilih titik tujuan"}</option>
+										{pickupPoints.map((point) => (
+											<option key={point.id} value={point.id}>{point.city} - {point.pos_name}</option>
+										))}
+									</select>
 									{selectedDestination && <p className="text-xs text-gray-400 mt-1">{selectedDestination.address}</p>}
-									{showDestinationDropdown && (
-										<div className="absolute left-0 right-0 bg-white border border-gray-200 rounded-2xl mt-2 shadow-xl max-h-64 overflow-y-auto z-50">
-											{filteredDestination.map((point) => (
-												<button
-													key={point.id}
-													onClick={() => {
-														setDestination(point.pos_name + " - " + point.city);
-														setSelectedDestination(point);
-														setShowDestinationDropdown(false);
-													}}
-													className="w-full flex items-start gap-3 text-left hover:bg-gray-50 border-gray-200 transition border-b last:border-none"
-												>
-													<div
-														key={point.id}
-														onClick={() => {
-															setSelectedDestination(point);
-															setDestination(`${point.city} - ${point.pos_name}`);
-															setShowDestinationDropdown(false);
-														}}
-														className="p-4 hover:bg-gray-50 cursor-pointer border-b last:border-none border-gray-100"
-													>
-														<p className="text-sm font-bold text-gray-800">
-															{point.city} - {point.pos_name}
-														</p>
-
-														<p className="text-xs text-gray-400">{point.address}</p>
-													</div>
-												</button>
-											))}
-										</div>
-									)}
 								</div>
 							</div>
 						</div>
@@ -269,7 +185,13 @@ export default function TambahNebeng() {
 							</div>
 							<div className="flex-1">
 								<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal</p>
-								<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-transparent font-black text-indigo-900 outline-none w-full" />
+								<input
+									type="date"
+									value={date}
+									min={getMinDateValue()}
+									onChange={handleDateChange}
+									className="bg-transparent font-black text-indigo-900 outline-none w-full"
+								/>
 							</div>
 						</div>
 						<div className="bg-white p-6 rounded-3xl border border-gray-100 flex items-center gap-4">
@@ -278,10 +200,20 @@ export default function TambahNebeng() {
 							</div>
 							<div className="flex-1">
 								<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Jam</p>
-								<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="bg-transparent font-black text-indigo-900 outline-none w-full" />
+								<input
+									type="time"
+									value={time}
+									min={getMinTimeValue(date)}
+									onChange={(e) => setTime(e.target.value)}
+									className="bg-transparent font-black text-indigo-900 outline-none w-full"
+								/>
 							</div>
 						</div>
 					</div>
+
+					{scheduleError && (
+						<p className="text-xs font-bold text-red-500 -mt-2 px-2">{scheduleError}</p>
+					)}
 
 					{/* PILIH JENIS TEBENGAN */}
 					<button onClick={() => setShowTypeModal(true)} className="w-full bg-white p-6 rounded-3xl border border-gray-100 flex items-center justify-between group hover:bg-gray-50 transition-all">
@@ -332,7 +264,8 @@ export default function TambahNebeng() {
 
 					<button
 						onClick={handleNext}
-						className="w-full bg-indigo-900 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+						disabled={isNextDisabled}
+						className="w-full bg-indigo-900 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-900"
 					>
 						Selanjutnya <ArrowRight size={24} />
 					</button>
@@ -390,13 +323,13 @@ export default function TambahNebeng() {
 										setBaggageCapacity(opt.id);
 										setShowBaggageModal(false);
 									}}
-									className={`w-full flex items-center gap-5 p-6 rounded-3xl transition-all border ${baggageCapacity === opt.label ? "bg-indigo-900 text-white border-indigo-900" : "bg-gray-50 border-gray-100"}`}
+									className={`w-full flex items-center gap-5 p-6 rounded-3xl transition-all border ${baggageCapacity === opt.id ? "bg-indigo-900 text-white border-indigo-900" : "bg-gray-50 border-gray-100"}`}
 								>
-									<div className={`p-3 rounded-xl ${baggageCapacity === opt.label ? "bg-white/10 text-white" : "bg-indigo-900 text-white"}`}>
+									<div className={`p-3 rounded-xl ${baggageCapacity === opt.id ? "bg-white/10 text-white" : "bg-indigo-900 text-white"}`}>
 										<Briefcase size={24} />
 									</div>
 									<span className="font-black text-lg flex-1 text-left leading-none">{opt.label}</span>
-									{baggageCapacity === opt.label && <CheckCircle2 size={24} className="text-sky-300" />}
+									{baggageCapacity === opt.id && <CheckCircle2 size={24} className="text-sky-300" />}
 								</button>
 							))}
 						</div>

@@ -13,6 +13,8 @@ use App\Models\PickupPoint;
 use App\Services\Maps\OSRMService;
 use App\Services\Pricing\TripPricingService;
 use App\Models\DriverBalance;
+use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class TripController extends Controller
 {
@@ -81,7 +83,7 @@ class TripController extends Controller
                 'destination_point_id' =>
                     'required|exists:pickup_points,id',
 
-                'departure_date' => 'required|date',
+                'departure_date' => 'required|date|after_or_equal:today',
 
                 'departure_time' => 'required',
 
@@ -98,6 +100,19 @@ class TripController extends Controller
                 'max_cap' =>
                     'nullable|integer|min:1',
             ]);
+
+            // ====================================
+            // VALIDASI: KEBERANGKATAN MINIMAL 3 JAM DARI SEKARANG
+            // ====================================
+            $departureAt = Carbon::parse(
+                $validated['departure_date'] . ' ' . $validated['departure_time']
+            );
+
+            if ($departureAt->lt(Carbon::now()->addHours(3))) {
+                throw ValidationException::withMessages([
+                    'departure_time' => 'Jadwal keberangkatan minimal 3 jam dari waktu sekarang.',
+                ]);
+            }
 
             // ====================================
             // AMBIL PICKUP POINT
@@ -377,6 +392,16 @@ if ($request->tebengan_type === "Barang") {
                 'trip' => $tripPassenger
 
             ]);
+
+        } catch (ValidationException $e) {
+
+            return response()->json([
+
+                'message' => collect($e->errors())->flatten()->first() ?? 'Data tidak valid',
+
+                'errors' => $e->errors(),
+
+            ], 422);
 
         } catch (\Exception $e) {
 

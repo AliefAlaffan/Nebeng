@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { ChevronLeft, MapPin, Calendar, Clock, ArrowRight, Navigation, X, CheckCircle2, Briefcase, ChevronDown } from "lucide-react";
+import { getMinDateValue, getMinTimeValue, validateDepartureSchedule } from "../../utils/scheduleValidation";
 
 export default function NebengBarang() {
 	const navigate = useNavigate();
@@ -91,10 +92,20 @@ export default function NebengBarang() {
 		setSelectedDestination(point || null);
 	};
 
+	// Dihitung ulang setiap render supaya selalu mengacu ke waktu terkini.
+	const scheduleCheck = date && time ? validateDepartureSchedule(date, time) : { valid: true };
+	const scheduleError = date && time && !scheduleCheck.valid ? scheduleCheck.message : null;
+
 	// ================= LOGIKA =================
 	const handleNext = () => {
 		if (!selectedOrigin || !selectedDestination || !date || !time || !baggageCapacity || !vehicleType) {
 			alert("Mohon lengkapi semua data pengiriman barang");
+			return;
+		}
+
+		const scheduleCheck = validateDepartureSchedule(date, time);
+		if (!scheduleCheck.valid) {
+			alert(scheduleCheck.message);
 			return;
 		}
 
@@ -196,7 +207,19 @@ export default function NebengBarang() {
 							</div>
 							<div className="flex-1">
 								<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Pengiriman</p>
-								<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-transparent font-black text-indigo-900 outline-none w-full" />
+								<input
+									type="date"
+									value={date}
+									min={getMinDateValue()}
+									onChange={(e) => {
+										setDate(e.target.value);
+										const minTime = getMinTimeValue(e.target.value);
+										if (minTime && time && time < minTime) {
+											setTime("");
+										}
+									}}
+									className="bg-transparent font-black text-indigo-900 outline-none w-full"
+								/>
 							</div>
 						</div>
 						<div className="bg-white p-6 rounded-3xl border border-gray-100 flex items-center gap-4 group cursor-pointer hover:bg-gray-50 transition-all">
@@ -205,10 +228,20 @@ export default function NebengBarang() {
 							</div>
 							<div className="flex-1">
 								<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Estimasi Jam</p>
-								<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="bg-transparent font-black text-indigo-900 outline-none w-full" />
+								<input
+									type="time"
+									value={time}
+									min={getMinTimeValue(date)}
+									onChange={(e) => setTime(e.target.value)}
+									className="bg-transparent font-black text-indigo-900 outline-none w-full"
+								/>
 							</div>
 						</div>
 					</div>
+
+					{scheduleError && (
+						<p className="text-xs font-bold text-red-500 -mt-2 px-2">{scheduleError}</p>
+					)}
 
 					{/* PILIH JENIS KENDARAAN */}
 					<div className="bg-white p-6 rounded-3xl border border-gray-100 space-y-3">
@@ -253,7 +286,8 @@ export default function NebengBarang() {
 					{/* SUBMIT BUTTON */}
 					<button
 						onClick={handleNext}
-						className="w-full bg-indigo-900 text-white py-5 rounded-[24px] font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+						disabled={!selectedOrigin || !selectedDestination || !date || !time || !baggageCapacity || !vehicleType || !!scheduleError}
+						className="w-full bg-indigo-900 text-white py-5 rounded-[24px] font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-900"
 					>
 						Selanjutnya <ArrowRight size={24} />
 					</button>
