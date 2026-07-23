@@ -591,6 +591,18 @@ export default function PerjalananMitra() {
 									))}
 								</div>
 							)}
+
+							{/* Trip selesai tapi tidak ada customer buat dirating (misal trip
+							kosong/tidak ada order) - kasih jalan keluar, jangan biarkan
+							mitra macet di layar ini tanpa aksi apapun */}
+							{tripStatus === "completed" && customers.length === 0 && (
+								<button
+									onClick={() => navigate("/mitra/dashboard")}
+									className="w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest bg-indigo-900 text-white shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3"
+								>
+									Kembali ke Beranda
+								</button>
+							)}
 						</div>
 					</div>
 				</div>
