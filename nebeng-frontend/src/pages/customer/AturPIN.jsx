@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
 import { ChevronLeft, Lock, ShieldCheck, Eye, EyeOff, Save, KeyRound } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function AturPIN() {
 	const navigate = useNavigate();
+	const location = useLocation();
+	const returnTo = location.state?.returnTo;
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPin, setShowPin] = useState(false);
 
@@ -75,7 +77,7 @@ export default function AturPIN() {
 			}
 
 			alert(hasPin ? "PIN berhasil diperbarui!" : "PIN berhasil dibuat!");
-			navigate("/customer/profil");
+			navigate(returnTo || "/customer/profil");
 		} catch (error) {
 			alert(error.message);
 		} finally {

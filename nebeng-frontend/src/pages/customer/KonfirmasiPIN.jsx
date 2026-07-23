@@ -29,7 +29,7 @@ export default function KonfirmasiPIN() {
 
 				if (data.has_pin === false) {
 					alert("Anda belum memiliki PIN keamanan. Silakan buat PIN terlebih dahulu.");
-					navigate("/customer/atur-pin");
+					navigate("/customer/atur-pin", { state: { returnTo: "/customer/konfirmasi-pin" } });
 				}
 			} catch (error) {
 				console.error("Check PIN error:", error);

@@ -57,12 +57,19 @@ class MitraTripQrController extends Controller
 
     public function generateDepartureQr($tripId)
     {
-        $trip = Trip::findOrFail($tripId);
+        $trip = Trip::with('orders')->findOrFail($tripId);
 
         if ($trip->status !== 'waiting_departure') {
             return response()->json([
                 'message' => 'Trip belum siap diberangkatkan'
             ], 400);
+        }
+
+        // Jaga-jaga: trip tanpa customer tidak boleh diberangkatkan
+        if ($trip->orders->count() === 0) {
+            return response()->json([
+                'message' => 'Belum ada customer yang memesan tebengan ini.'
+            ], 422);
         }
 
         $existingSession = TripQrSession::where(

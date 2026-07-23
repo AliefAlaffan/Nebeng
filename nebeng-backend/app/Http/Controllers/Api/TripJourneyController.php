@@ -107,6 +107,21 @@ class TripJourneyController extends Controller
             ], 400);
         }
 
+        // =====================================
+        // CEGAH KEBERANGKATAN TANPA CUSTOMER
+        // =====================================
+        // Tidak masuk akal mitra berangkat/membawa
+        // sesuatu jika belum ada satupun pesanan
+        // (penumpang/pengirim barang) pada trip ini.
+        if (
+            $request->status === 'waiting_departure' &&
+            $trip->orders->count() === 0
+        ) {
+            return response()->json([
+                'message' => 'Belum ada customer yang memesan tebengan ini. Tunggu hingga ada pesanan sebelum berangkat.'
+            ], 422);
+        }
+
         $trip->status = $request->status;
         $trip->save();
 

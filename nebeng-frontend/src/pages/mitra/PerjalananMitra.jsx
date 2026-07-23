@@ -308,7 +308,7 @@ export default function PerjalananMitra() {
 				console.log("DEPARTURE QR:", data);
 
 				if (!response.ok) {
-					console.error(data);
+					alert(data.message || "Gagal membuat QR keberangkatan.");
 					return;
 				}
 
@@ -352,7 +352,7 @@ export default function PerjalananMitra() {
 			console.log("STATUS UPDATED:", data);
 
 			if (!response.ok) {
-				console.error(data);
+				alert(data.message || "Gagal memperbarui status perjalanan.");
 				return;
 			}
 
@@ -547,11 +547,15 @@ export default function PerjalananMitra() {
 
 						{/* MAIN ACTION BUTTON */}
 						<div className="pt-4 sticky bottom-0 bg-white space-y-3">
+							{tripStatus === "active" && customers.length === 0 && (
+								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer memesan tebengan ini sebelum bisa berangkat.</p>
+							)}
+
 							<button
 								onClick={handleStatusAction}
-								disabled={tripStatus === "completed"}
+								disabled={tripStatus === "completed" || (tripStatus === "active" && customers.length === 0)}
 								className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] shadow-xl
-            ${tripStatus === "completed" ? "bg-emerald-500 shadow-emerald-100" : "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"}
+            ${tripStatus === "completed" ? "bg-emerald-500 shadow-emerald-100" : tripStatus === "active" && customers.length === 0 ? "bg-gray-300 shadow-none cursor-not-allowed" : "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"}
         `}
 							>
 								{tripStatus === "completed" ? (
@@ -590,18 +594,6 @@ export default function PerjalananMitra() {
 										</button>
 									))}
 								</div>
-							)}
-
-							{/* Trip selesai tapi tidak ada customer buat dirating (misal trip
-							kosong/tidak ada order) - kasih jalan keluar, jangan biarkan
-							mitra macet di layar ini tanpa aksi apapun */}
-							{tripStatus === "completed" && customers.length === 0 && (
-								<button
-									onClick={() => navigate("/mitra/dashboard")}
-									className="w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest bg-indigo-900 text-white shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3"
-								>
-									Kembali ke Beranda
-								</button>
 							)}
 						</div>
 					</div>
