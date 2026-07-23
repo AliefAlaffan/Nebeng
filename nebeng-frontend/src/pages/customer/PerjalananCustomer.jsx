@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
 import { ChevronLeft, MessageCircle, Navigation, Clock3, ChevronUp, ChevronDown, ShieldAlert, Car, MapPin, Crosshair } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -6,7 +6,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import QRCode from "react-qr-code";
-import echo from "../../lib/echo";
+import SuccessPopup from "../../components/ui/SuccessPopup";
 
 // ================= CUSTOM MAP ICONS =================
 const driverIcon = L.divIcon({
@@ -78,12 +78,28 @@ export default function PerjalananCustomer() {
 	const [activeRoute, setActiveRoute] = useState([]);
 	const [qrData, setQrData] = useState(null);
 	const [showQR, setShowQR] = useState(false);
+	const [justVerified, setJustVerified] = useState(false);
+	const prevReadinessRef = useRef(null);
 
 	const order = trip?.orders?.[0];
 
 	const showQrButton = tripStatus === "waiting_departure" && order?.readiness_status === "waiting";
 
 	const showReadyInfo = tripStatus === "waiting_departure" && order?.readiness_status === "ready";
+
+	// Begitu Pos Mitra berhasil verifikasi QR customer (readiness_status berubah
+	// dari "waiting" ke status lain), tutup otomatis modal QR yang sedang terbuka
+	// dan tampilkan notifikasi popup satu kali saja (bukan tiap polling).
+	useEffect(() => {
+		const current = order?.readiness_status;
+
+		if (prevReadinessRef.current === "waiting" && current && current !== "waiting") {
+			if (showQR) setShowQR(false);
+			setJustVerified(true);
+		}
+
+		prevReadinessRef.current = current ?? prevReadinessRef.current;
+	}, [order?.readiness_status, showQR]);
 
 	// ---Simulasi posisi driver bergerak sepanjang rute---
 	// const [routeProgress, setRouteProgress] = useState(0);
@@ -99,80 +115,59 @@ export default function PerjalananCustomer() {
 	// 	return () => clearTimeout(timer);
 	// }, []);
 
-	const fetchTrip = useCallback(async () => {
-		try {
-			const token = localStorage.getItem("token");
-
-			const res = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}/journey`, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-					Accept: "application/json",
-				},
-			});
-
-			const data = await res.json();
-
-			console.log("TRIP CUSTOMER:", data);
-
-			setTrip(data.trip);
-
-			if (data.latest_tracking) {
-				setDriverPosition([Number(data.latest_tracking.latitude), Number(data.latest_tracking.longitude)]);
-			}
-
-			// sync status dari backend
-			if (data.trip.status === "waiting_departure") {
-				setTripStatus("waiting_departure");
-			}
-
-			if (data.trip.status === "on_the_way") {
-				setTripStatus("on_the_way");
-			}
-
-			if (data.trip.status === "arrived_destination") {
-				setTripStatus("arrived_destination");
-			}
-
-			if (data.trip.status === "completed") {
-				setTripStatus("completed");
-			}
-		} catch (err) {
-			console.error(err);
-		} finally {
-			setLoading(false);
-		}
-	}, [tripId]);
-
 	useEffect(() => {
-		fetchTrip();
-	}, [fetchTrip]);
+		const fetchTrip = async () => {
+			try {
+				const token = localStorage.getItem("token");
 
-	// ================= REALTIME: QR sudah discan POS Mitra =================
-	// Sebelumnya harus refresh manual biar modal QR berubah jadi "sudah
-	// siap". Sekarang dengarkan event broadcast dari backend, fetch ulang
-	// data trip, dan otomatis tutup modal QR karena sudah tidak diperlukan.
-	useEffect(() => {
-		const storedUser = localStorage.getItem("user");
-		const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-		const userId = parsedUser?.id;
+				const res = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}/journey`, {
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+					},
+				});
 
-		if (!userId) return;
+				const data = await res.json();
 
-		const channel = echo.private(`customer.${userId}`);
+				console.log("TRIP CUSTOMER:", data);
 
-		channel.listen(".customer-ready", (e) => {
-			console.log("CUSTOMER READY EVENT:", e);
+				setTrip(data.trip);
 
-			if (String(e.trip_id) === String(tripId)) {
-				fetchTrip();
-				setShowQR(false);
+				if (data.latest_tracking) {
+					setDriverPosition([Number(data.latest_tracking.latitude), Number(data.latest_tracking.longitude)]);
+				}
+
+				// sync status dari backend
+				if (data.trip.status === "waiting_departure") {
+					setTripStatus("waiting_departure");
+				}
+
+				if (data.trip.status === "on_the_way") {
+					setTripStatus("on_the_way");
+				}
+
+				if (data.trip.status === "arrived_destination") {
+					setTripStatus("arrived_destination");
+				}
+
+				if (data.trip.status === "completed") {
+					setTripStatus("completed");
+				}
+			} catch (err) {
+				console.error(err);
+			} finally {
+				setLoading(false);
 			}
-		});
-
-		return () => {
-			channel.stopListening(".customer-ready");
 		};
-	}, [tripId, fetchTrip]);
+
+		fetchTrip();
+
+		// Auto-refresh berkala supaya data pesanan (mis. status verifikasi QR oleh
+		// Pos Mitra) selalu terkini tanpa perlu reload manual.
+		const interval = setInterval(fetchTrip, 4000);
+
+		return () => clearInterval(interval);
+	}, [tripId]);
 
 	const handleGenerateQR = async () => {
 		try {
@@ -277,8 +272,13 @@ export default function PerjalananCustomer() {
 
 				console.log("LATEST LOCATION:", data);
 
-				// Belum ada tracking
+				// Belum ada tracking GPS, tapi status trip tetap perlu di-sync
 				if (!res.ok) {
+					if (data.trip_status === "waiting_departure") setTripStatus("waiting_departure");
+					if (data.trip_status === "on_the_way") setTripStatus("on_the_way");
+					if (data.trip_status === "arrived_destination") setTripStatus("arrived_destination");
+					if (data.trip_status === "completed") setTripStatus("completed");
+
 					return;
 				}
 
@@ -293,6 +293,10 @@ export default function PerjalananCustomer() {
 
 					if (data.trip_status === "on_the_way") {
 						setTripStatus("on_the_way");
+					}
+
+					if (data.trip_status === "arrived_destination") {
+						setTripStatus("arrived_destination");
 					}
 
 					if (data.trip_status === "completed") {
@@ -691,6 +695,13 @@ export default function PerjalananCustomer() {
 					</div>
 				</div>
 			)}
+
+			<SuccessPopup
+				show={justVerified}
+				onClose={() => setJustVerified(false)}
+				title="Anda Sudah Diverifikasi"
+				message="Pos Mitra telah memverifikasi QR Anda. Menunggu mitra memulai perjalanan."
+			/>
 		</CustomerLayout>
 	);
 }

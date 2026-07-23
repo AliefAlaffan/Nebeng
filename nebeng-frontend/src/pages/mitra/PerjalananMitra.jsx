@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { MapPin, MessageCircle, ChevronLeft, Navigation, CheckCircle2, Clock3, ChevronUp, ChevronDown, Milestone, Maximize2, Crosshair } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import QRCode from "react-qr-code";
-import echo from "../../lib/echo";
+import SuccessPopup from "../../components/ui/SuccessPopup";
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -129,6 +129,7 @@ export default function PerjalananMitra() {
 	const [loading, setLoading] = useState(true);
 
 	const [showDepartureQR, setShowDepartureQR] = useState(false);
+	const [departureVerified, setDepartureVerified] = useState(false);
 	const [departureQR, setDepartureQR] = useState(null);
 	const [loadingQR, setLoadingQR] = useState(false);
 
@@ -142,116 +143,80 @@ export default function PerjalananMitra() {
 	const [currentPosition, setCurrentPosition] = useState(null);
 	const [activeRoute, setActiveRoute] = useState([]);
 
-	const fetchJourney = useCallback(async () => {
-		try {
-			const response = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}`);
-
-			const data = await response.json();
-
-			console.log("JOURNEY:", data);
-
-			setTrip(data);
-
-			setTripStatus(data.status);
-
-			setOriginPoint({
-				name: data.origin_point.pos_name,
-				address: data.origin_point.address,
-				coords: [Number(data.origin_point.latitude), Number(data.origin_point.longitude)],
-			});
-
-			setDestinationPoint({
-				name: data.destination_point.pos_name,
-				address: data.destination_point.address,
-				coords: [Number(data.destination_point.latitude), Number(data.destination_point.longitude)],
-			});
-
-			// CUSTOMER PERTAMA
-			if (data.orders?.length > 0) {
-				const formattedCustomers = data.orders.map((order) => ({
-					id: order.user?.id,
-					name: order.user?.name || `Customer #${order.customer_id}`,
-
-					photo: order.user?.avatar ? `http://127.0.0.1:8000/storage/${order.user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.user?.name || "Customer"}`,
-
-					phone: order.user?.phone || "",
-
-					type: data.vehicle_type === "barang" ? "Pengirim Barang" : "Penumpang Perjalanan",
-
-					isReady: order.readiness_status === "ready",
-				}));
-
-				setCustomers(formattedCustomers);
-			}
-
-			// GEOJSON ROUTE
-			if (data.route_geojson) {
-				const geo = typeof data.route_geojson === "string" ? JSON.parse(data.route_geojson) : data.route_geojson;
-
-				if (geo.coordinates) {
-					const formatted = geo.coordinates.map((coord) => [coord[1], coord[0]]);
-
-					setRoutePath(formatted);
-				}
-			}
-
-			// TRACKING TERBARU
-			if (data.latest_tracking) {
-				setCurrentPosition([Number(data.latest_tracking.latitude), Number(data.latest_tracking.longitude)]);
-			} else {
-				setCurrentPosition([Number(data.origin_point.latitude), Number(data.origin_point.longitude)]);
-			}
-		} catch (error) {
-			console.error(error);
-		} finally {
-			setLoading(false);
-		}
-	}, [tripId]);
-
 	useEffect(() => {
-		fetchJourney();
-	}, [fetchJourney]);
-
-	// ================= REALTIME: customer selesai discan POS Mitra =================
-	// Sebelumnya di sini harus refresh manual biar "Customer Perjalanan"
-	// dan status "Siap Berangkat" update. Sekarang dengarkan event
-	// broadcast dari backend dan langsung fetch ulang data trip.
-	useEffect(() => {
-		const storedUser = localStorage.getItem("user");
-		const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-		const userId = parsedUser?.id;
-
-		if (!userId) return;
-
-		const channel = echo.private(`mitra.${userId}`);
-
-		channel.listen(".customer-ready", (e) => {
-			console.log("CUSTOMER READY EVENT:", e);
-
-			if (String(e.trip_id) === String(tripId)) {
-				fetchJourney();
-			}
-		});
-
-		return () => {
-			channel.stopListening(".customer-ready");
-		};
-	}, [tripId, fetchJourney]);
-
-	useEffect(() => {
-		const interval = setInterval(async () => {
+		const fetchJourney = async () => {
 			try {
-				const response = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}/journey`);
+				const response = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}`);
 
 				const data = await response.json();
 
-				if (data.trip?.status) {
-					setTripStatus(data.trip.status);
+				console.log("JOURNEY:", data);
+
+				setTrip(data);
+
+				setTripStatus(data.status);
+
+				setOriginPoint({
+					name: data.origin_point.pos_name,
+					address: data.origin_point.address,
+					coords: [Number(data.origin_point.latitude), Number(data.origin_point.longitude)],
+				});
+
+				setDestinationPoint({
+					name: data.destination_point.pos_name,
+					address: data.destination_point.address,
+					coords: [Number(data.destination_point.latitude), Number(data.destination_point.longitude)],
+				});
+
+				// CUSTOMER (di-refresh terus tiap polling supaya customer baru langsung muncul
+				// tanpa perlu reload manual)
+				if (data.orders?.length > 0) {
+					const formattedCustomers = data.orders.map((order) => ({
+						id: order.user?.id,
+						name: order.user?.name || `Customer #${order.customer_id}`,
+
+						photo: order.user?.avatar ? `http://127.0.0.1:8000/storage/${order.user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.user?.name || "Customer"}`,
+
+						phone: order.user?.phone || "",
+
+						type: data.vehicle_type === "barang" ? "Pengirim Barang" : "Penumpang Perjalanan",
+					}));
+
+					setCustomers(formattedCustomers);
+				} else {
+					setCustomers([]);
 				}
-			} catch (err) {
-				console.error(err);
+
+				// GEOJSON ROUTE
+				if (data.route_geojson) {
+					const geo = typeof data.route_geojson === "string" ? JSON.parse(data.route_geojson) : data.route_geojson;
+
+					if (geo.coordinates) {
+						const formatted = geo.coordinates.map((coord) => [coord[1], coord[0]]);
+
+						setRoutePath(formatted);
+					}
+				}
+
+				// TRACKING TERBARU
+				if (data.latest_tracking) {
+					setCurrentPosition([Number(data.latest_tracking.latitude), Number(data.latest_tracking.longitude)]);
+				} else {
+					setCurrentPosition([Number(data.origin_point.latitude), Number(data.origin_point.longitude)]);
+				}
+			} catch (error) {
+				console.error(error);
+			} finally {
+				setLoading(false);
 			}
-		}, 5000);
+		};
+
+		fetchJourney();
+
+		// Auto-refresh berkala (termasuk daftar customer/orders) supaya perubahan dari
+		// pihak lain (customer baru pesan, QR di-scan, dsb) langsung terlihat tanpa
+		// perlu me-refresh halaman secara manual.
+		const interval = setInterval(fetchJourney, 5000);
 
 		return () => clearInterval(interval);
 	}, [tripId]);
@@ -412,6 +377,7 @@ export default function PerjalananMitra() {
 				if (data.status === "on_the_way") {
 					setTripStatus("on_the_way");
 					setShowDepartureQR(false);
+					setDepartureVerified(true);
 				}
 			} catch (err) {
 				console.error(err);
@@ -580,29 +546,17 @@ export default function PerjalananMitra() {
 								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer memesan tebengan ini sebelum bisa berangkat.</p>
 							)}
 
-							{tripStatus === "waiting_departure" && customers.some((c) => !c.isReady) && (
-								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">
-									Masih ada customer yang belum check-in (scan QR) di Pos Mitra. Perjalanan belum bisa dimulai.
-								</p>
-							)}
-
 							<button
-								onClick={tripStatus === "completed" ? () => navigate("/mitra/dashboard") : handleStatusAction}
-								disabled={(tripStatus === "active" && customers.length === 0) || (tripStatus === "waiting_departure" && customers.some((c) => !c.isReady))}
-								className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 shadow-xl
-            ${
-				tripStatus === "completed"
-					? "bg-emerald-500 shadow-emerald-100 hover:bg-emerald-600 active:scale-[0.98]"
-					: (tripStatus === "active" && customers.length === 0) || (tripStatus === "waiting_departure" && customers.some((c) => !c.isReady))
-						? "bg-gray-300 shadow-none cursor-not-allowed"
-						: "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98]"
-			}
+								onClick={handleStatusAction}
+								disabled={tripStatus === "completed" || (tripStatus === "active" && customers.length === 0)}
+								className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] shadow-xl
+            ${tripStatus === "completed" ? "bg-emerald-500 shadow-emerald-100" : tripStatus === "active" && customers.length === 0 ? "bg-gray-300 shadow-none cursor-not-allowed" : "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"}
         `}
 							>
 								{tripStatus === "completed" ? (
 									<>
 										<CheckCircle2 size={18} />
-										Kembali ke Beranda
+										Perjalanan Selesai
 									</>
 								) : (
 									<>
@@ -611,8 +565,6 @@ export default function PerjalananMitra() {
 									</>
 								)}
 							</button>
-
-							{tripStatus === "completed" && customers.length > 0 && <p className="text-xs text-center font-semibold text-gray-400 -mt-1">Trip sudah selesai. Beri rating customer di bawah (opsional).</p>}
 
 							{/* BUTTON RATING CUSTOMER */}
 							{tripStatus === "completed" && customers.length > 0 && (
@@ -679,6 +631,8 @@ export default function PerjalananMitra() {
 					</div>
 				</div>
 			)}
+
+			<SuccessPopup show={departureVerified} onClose={() => setDepartureVerified(false)} title="Perjalanan Dimulai" message="QR keberangkatan berhasil diverifikasi Pos Mitra. Selamat menempuh perjalanan." />
 		</MitraLayout>
 	);
 }

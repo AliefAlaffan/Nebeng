@@ -2,9 +2,9 @@ import React from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { ChevronLeft, MessageSquare, User, Phone, MapPin, Package, ReceiptText, Info, ArrowRight, Navigation } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import QRCode from "react-qr-code";
-import echo from "../../lib/echo";
+import SuccessPopup from "../../components/ui/SuccessPopup";
 
 // Helper: return tailwind classes for status badge color
 function getStatusColor(status) {
@@ -26,50 +26,41 @@ export default function DetailTebenganMitra() {
 
 	const [qrData, setQrData] = useState(null);
 	const [showQR, setShowQR] = useState(false);
+	const [justCompleted, setJustCompleted] = useState(false);
 
-	const fetchTrip = useCallback(async () => {
-		try {
-			const res = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}`);
-			const data = await res.json();
+	useEffect(() => {
+		const fetchTrip = async () => {
+			try {
+				const res = await fetch(`http://127.0.0.1:8000/api/trips/${tripId}`);
+				const data = await res.json();
 
-			console.log("DATA TRIP:", data);
-			setTrip(data);
-		} catch (err) {
-			console.error(err);
-		} finally {
-			setLoading(false);
-		}
+				console.log("DATA TRIP:", data);
+				setTrip(data);
+			} catch (err) {
+				console.error(err);
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchTrip();
+
+		// Auto-refresh berkala supaya status trip (mis. setelah QR di-scan Pos Mitra)
+		// selalu terkini tanpa perlu reload manual.
+		const interval = setInterval(fetchTrip, 4000);
+
+		return () => clearInterval(interval);
 	}, [tripId]);
 
+	// Saat QR kedatangan sedang ditampilkan, begitu status trip berubah jadi
+	// "completed" (artinya sudah berhasil di-scan Pos Mitra), tutup modal QR
+	// otomatis dan tampilkan notifikasi berhasil.
 	useEffect(() => {
-		fetchTrip();
-	}, [fetchTrip]);
-
-	// ================= REALTIME: customer selesai discan POS Mitra =================
-	// Sebelumnya halaman ini harus di-refresh manual biar list order/customer
-	// update. Sekarang dengarkan event broadcast dari backend dan langsung
-	// fetch ulang data trip.
-	useEffect(() => {
-		const storedUser = localStorage.getItem("user");
-		const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-		const userId = parsedUser?.id;
-
-		if (!userId) return;
-
-		const channel = echo.private(`mitra.${userId}`);
-
-		channel.listen(".customer-ready", (e) => {
-			console.log("CUSTOMER READY EVENT:", e);
-
-			if (String(e.trip_id) === String(tripId)) {
-				fetchTrip();
-			}
-		});
-
-		return () => {
-			channel.stopListening(".customer-ready");
-		};
-	}, [tripId, fetchTrip]);
+		if (showQR && trip?.status === "completed") {
+			setShowQR(false);
+			setJustCompleted(true);
+		}
+	}, [trip?.status, showQR]);
 
 	if (loading) {
 		return (
@@ -422,6 +413,8 @@ export default function DetailTebenganMitra() {
 					</div>
 				</div>
 			)}
+
+			<SuccessPopup show={justCompleted} onClose={() => setJustCompleted(false)} title="Perjalanan Selesai" message="QR berhasil diverifikasi Pos Mitra. Perjalanan ini telah selesai." />
 		</MitraLayout>
 	);
 }
