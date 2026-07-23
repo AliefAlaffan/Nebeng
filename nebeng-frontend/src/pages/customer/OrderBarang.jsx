@@ -21,6 +21,25 @@ export default function OrderBarang() {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [sortBy, setSortBy] = useState("default");
 	const [rides, setRides] = useState([]);
+	const [originInfo, setOriginInfo] = useState(null);
+	const [destinationInfo, setDestinationInfo] = useState(null);
+
+	// Ambil nama kota & pos asli sesuai origin_id/destination_id di URL
+	useEffect(() => {
+		const fetchPoints = async () => {
+			try {
+				const res = await fetch("http://127.0.0.1:8000/api/pickup-points");
+				const data = await res.json();
+
+				setOriginInfo(data.find((p) => String(p.id) === String(origin_id)) || null);
+				setDestinationInfo(data.find((p) => String(p.id) === String(destination_id)) || null);
+			} catch (err) {
+				console.error("Error fetch pickup points:", err);
+			}
+		};
+
+		if (origin_id && destination_id) fetchPoints();
+	}, [origin_id, destination_id]);
 
 	const cleanLocation = (text) => {
 		return text?.split("-")[0].trim().toLowerCase();
@@ -292,11 +311,11 @@ export default function OrderBarang() {
 
 						<div className="flex flex-col sm:flex-row items-start sm:items-center gap-1">
 							<div className="flex items-center gap-2 text-lg sm:text-xl font-black text-indigo-900 tracking-tight">
-								<span className="max-w-27.5 sm:max-w-none truncate">{searchParams.origin || "Yogyakarta"}</span>
+								<span className="max-w-27.5 sm:max-w-none truncate">{originInfo?.city || "-"}</span>
 
 								<ArrowRight size={18} className="text-gray-300 hidden sm:inline" />
 
-								<span className="max-w-27.5 sm:max-w-none truncate">{searchParams.destination || "Purwokerto"}</span>
+								<span className="max-w-27.5 sm:max-w-none truncate">{destinationInfo?.city || "-"}</span>
 							</div>
 						</div>
 					</div>

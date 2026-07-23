@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { ChevronLeft, MapPin, Calendar, Clock, Users, ArrowRight, Navigation, X, CheckCircle2, Briefcase, ChevronDown } from "lucide-react";
@@ -7,10 +7,16 @@ export default function TambahNebeng() {
 	const navigate = useNavigate();
 
 	// ================= STATE =================
+	const [origin, setOrigin] = useState("");
+	const [destination, setDestination] = useState("");
 	const [date, setDate] = useState("");
 
 	const [pickupPoints, setPickupPoints] = useState([]);
-	const [loadingPoints, setLoadingPoints] = useState(true);
+	const [showOriginDropdown, setShowOriginDropdown] = useState(false);
+	const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
+
+	const [filteredOrigin, setFilteredOrigin] = useState([]);
+	const [filteredDestination, setFilteredDestination] = useState([]);
 
 	const [selectedOrigin, setSelectedOrigin] = useState(null);
 	const [selectedDestination, setSelectedDestination] = useState(null);
@@ -21,6 +27,9 @@ export default function TambahNebeng() {
 
 	const [showTypeModal, setShowTypeModal] = useState(false);
 	const [showBaggageModal, setShowBaggageModal] = useState(false);
+
+	const originRef = useRef(null);
+	const destinationRef = useRef(null);
 
 	// ================= DATA OPTIONS =================
 	const typeOptions = [
@@ -36,7 +45,10 @@ export default function TambahNebeng() {
 		{ id: "besar", label: "Besar - Maksimal 15 Kg" },
 	];
 
-	const filteredBaggageOptions = baggageOptions;
+	const filteredBaggageOptions = baggageOptions.filter((option) => {
+		// motor hanya support dokumen & kecil
+		return ["xxs", "xs", "kecil"].includes(option.id);
+	});
 
 	const handleNext = () => {
 		if (!selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount) {
@@ -58,11 +70,12 @@ export default function TambahNebeng() {
 			destination_address: selectedDestination.address,
 			departure_date: date,
 			departure_time: time,
-			seat_total: seatCount,
-			seat_available: seatCount,
+			seat_total: 1,
+			seat_available: 1,
 			tebengan_type: tebenganType,
 			baggage_capacity: baggageCapacity,
-			vehicle_type: "mobil",
+			vehicle_type: "motor",
+			// price: 25000, //sementara
 		};
 
 		navigate("/mitra/konfirmasi-tebengan", {
@@ -70,17 +83,51 @@ export default function TambahNebeng() {
 		});
 	};
 
-	const handleOriginSelect = (e) => {
-		const point = pickupPoints.find((p) => String(p.id) === e.target.value);
-		setSelectedOrigin(point || null);
-	};
+	const handleOriginChange = (e) => {
+		const value = e.target.value;
+		setOrigin(value);
+		setSelectedOrigin(null);
 
-	const handleDestinationSelect = (e) => {
-		const point = pickupPoints.find((p) => String(p.id) === e.target.value);
-		setSelectedDestination(point || null);
+		if (value.length > 0) {
+			const filtered = pickupPoints.filter((p) => {
+				const city = p.city?.toLowerCase() || "";
+				const pos = p.pos_name?.toLowerCase() || "";
+				const address = p.address?.toLowerCase() || "";
+
+				return city.includes(value.toLowerCase()) || pos.includes(value.toLowerCase()) || address.includes(value.toLowerCase());
+			});
+
+			setFilteredOrigin(filtered);
+			setShowOriginDropdown(true);
+			setShowDestinationDropdown(false);
+		} else {
+			setShowOriginDropdown(false);
+		}
 	};
 
 	const selectedBaggageLabel = filteredBaggageOptions.find((opt) => opt.id === baggageCapacity)?.label || "Pilih Kapasitas";
+
+	const handleDestinationChange = (e) => {
+		const value = e.target.value;
+		setDestination(value);
+		setSelectedDestination(null);
+
+		if (value.length > 0) {
+			const filtered = pickupPoints.filter((p) => {
+				const city = p.city?.toLowerCase() || "";
+				const pos = p.pos_name?.toLowerCase() || "";
+				const address = p.address?.toLowerCase() || "";
+
+				return city.includes(value.toLowerCase()) || pos.includes(value.toLowerCase()) || address.includes(value.toLowerCase());
+			});
+
+			setFilteredDestination(filtered);
+			setShowDestinationDropdown(true);
+			setShowOriginDropdown(false);
+		} else {
+			setShowDestinationDropdown(false);
+		}
+	};
 
 	useEffect(() => {
 		const fetchPickupPoints = async () => {
@@ -90,12 +137,28 @@ export default function TambahNebeng() {
 				setPickupPoints(data);
 			} catch (err) {
 				console.error(err);
-			} finally {
-				setLoadingPoints(false);
 			}
 		};
 
 		fetchPickupPoints();
+	}, []);
+
+	useEffect(() => {
+		const handleClickOutside = (e) => {
+			if (originRef.current && !originRef.current.contains(e.target)) {
+				setShowOriginDropdown(false);
+			}
+
+			if (destinationRef.current && !destinationRef.current.contains(e.target)) {
+				setShowDestinationDropdown(false);
+			}
+		};
+
+		document.addEventListener("mousedown", handleClickOutside);
+
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
 	}, []);
 
 	return (
@@ -105,7 +168,7 @@ export default function TambahNebeng() {
 					<button onClick={() => navigate(-1)} className="p-2 bg-white rounded-xl shadow-sm border border-gray-100 hover:bg-gray-50 transition-colors">
 						<ChevronLeft size={24} className="text-indigo-900" />
 					</button>
-					<h1 className="text-2xl font-black text-indigo-900 tracking-tight">Tambah Tebengan Mobil</h1>
+					<h1 className="text-2xl font-black text-indigo-900 tracking-tight">Tambah Tebengan Motor</h1>
 				</div>
 
 				<div className="max-w-2xl mx-auto space-y-6">
@@ -117,34 +180,82 @@ export default function TambahNebeng() {
 								<div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-100">
 									<Navigation size={20} className="transform rotate-45" />
 								</div>
-								<div className="flex-1 border-b border-gray-100 relative">
+								<div ref={originRef} className="flex-1 border-b border-gray-100 relative">
 									<label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Lokasi Awal</label>
-									<select value={selectedOrigin?.id || ""} onChange={handleOriginSelect} disabled={loadingPoints} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none disabled:opacity-50">
-										<option value="">{loadingPoints ? "Memuat titik jemput..." : "Pilih titik jemput"}</option>
-										{pickupPoints.map((point) => (
-											<option key={point.id} value={point.id}>
-												{point.city} - {point.pos_name}
-											</option>
-										))}
-									</select>
+									<input type="text" placeholder="Masukkan titik jemput" value={origin} onChange={handleOriginChange} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none" />
 									{selectedOrigin && <p className="text-xs text-gray-400 mt-1">{selectedOrigin.address}</p>}
+									{showOriginDropdown && (
+										<div className="absolute left-0 right-0 bg-white border border-gray-100 rounded-2xl mt-2 shadow-xl max-h-64 overflow-y-auto z-50">
+											{filteredOrigin.map((point) => (
+												<button
+													key={point.id}
+													onClick={() => {
+														setOrigin(point.pos_name + " - " + point.city);
+														setSelectedOrigin(point);
+														setShowOriginDropdown(false);
+													}}
+													className="w-full flex items-start gap-3 text-left hover:bg-gray-50 transition border-gray-200 border-b last:border-none"
+												>
+													<div
+														key={point.id}
+														onClick={() => {
+															setSelectedOrigin(point);
+															setOrigin(`${point.city} - ${point.pos_name}`);
+															setShowOriginDropdown(false);
+														}}
+														className="p-4 hover:bg-gray-50 cursor-pointer border-b last:border-none border-gray-100"
+													>
+														<p className="text-sm font-bold text-gray-800">
+															{point.city} - {point.pos_name}
+														</p>
+
+														<p className="text-xs text-gray-400">{point.address}</p>
+													</div>
+												</button>
+											))}
+										</div>
+									)}
 								</div>
 							</div>
 							<div className="flex items-center gap-4 relative z-9">
 								<div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-orange-100">
 									<MapPin size={20} />
 								</div>
-								<div className="flex-1 border-b border-gray-100 relative">
+								<div ref={destinationRef} className="flex-1 border-b border-gray-100 relative">
 									<label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Lokasi Tujuan</label>
-									<select value={selectedDestination?.id || ""} onChange={handleDestinationSelect} disabled={loadingPoints} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none disabled:opacity-50">
-										<option value="">{loadingPoints ? "Memuat titik tujuan..." : "Pilih titik tujuan"}</option>
-										{pickupPoints.map((point) => (
-											<option key={point.id} value={point.id}>
-												{point.city} - {point.pos_name}
-											</option>
-										))}
-									</select>
+									<input type="text" placeholder="Masukkan titik tujuan" value={destination} onChange={handleDestinationChange} className="w-full text-lg font-bold text-gray-800 bg-transparent py-2 outline-none" />
 									{selectedDestination && <p className="text-xs text-gray-400 mt-1">{selectedDestination.address}</p>}
+									{showDestinationDropdown && (
+										<div className="absolute left-0 right-0 bg-white border border-gray-200 rounded-2xl mt-2 shadow-xl max-h-64 overflow-y-auto z-50">
+											{filteredDestination.map((point) => (
+												<button
+													key={point.id}
+													onClick={() => {
+														setDestination(point.pos_name + " - " + point.city);
+														setSelectedDestination(point);
+														setShowDestinationDropdown(false);
+													}}
+													className="w-full flex items-start gap-3 text-left hover:bg-gray-50 border-gray-200 transition border-b last:border-none"
+												>
+													<div
+														key={point.id}
+														onClick={() => {
+															setSelectedDestination(point);
+															setDestination(`${point.city} - ${point.pos_name}`);
+															setShowDestinationDropdown(false);
+														}}
+														className="p-4 hover:bg-gray-50 cursor-pointer border-b last:border-none border-gray-100"
+													>
+														<p className="text-sm font-bold text-gray-800">
+															{point.city} - {point.pos_name}
+														</p>
+
+														<p className="text-xs text-gray-400">{point.address}</p>
+													</div>
+												</button>
+											))}
+										</div>
+									)}
 								</div>
 							</div>
 						</div>
@@ -196,7 +307,8 @@ export default function TambahNebeng() {
 								</div>
 								<div className="flex-1">
 									<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">JUMLAH KURSI TERSEDIA</p>
-									<input type="number" min="1" value={seatCount} onChange={(e) => setSeatCount(e.target.value)} className="bg-white font-black text-indigo-900 outline-none w-full text-lg" />
+									<input type="number" value={1} readOnly className="bg-white font-black text-indigo-900 outline-none w-full text-lg cursor-not-allowed" />
+									<p className="text-[10px] text-gray-400 mt-1">Motor hanya dapat mengangkut 1 penumpang</p>
 								</div>
 							</div>
 
@@ -240,7 +352,10 @@ export default function TambahNebeng() {
 									key={opt.id}
 									onClick={() => {
 										setTebenganType(opt.label);
+
+										// reset kapasitas
 										setBaggageCapacity("");
+
 										setShowTypeModal(false);
 									}}
 									className={`w-full flex items-center gap-5 p-5 rounded-3xl transition-all border ${tebenganType === opt.label ? "bg-indigo-900 text-white border-indigo-900" : "bg-gray-50 border-gray-100"}`}
