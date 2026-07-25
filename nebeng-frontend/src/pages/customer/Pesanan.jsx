@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, Bike, Car, Package, ArrowUp, MapPin, Users, Calendar, Compass, XCircle, Home, Loader2 } from "lucide-react";
+import { ChevronLeft, Bike, Car, Package, ArrowUp, MapPin, Users, Calendar, Compass, XCircle, Home, Loader2, Star } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
 export default function Pesanan() {
@@ -188,6 +188,15 @@ export default function Pesanan() {
 					>
 						<Home size={16} /> Kembali Ke Beranda
 					</button>
+
+					{isCompleted && (
+						<button
+							onClick={() => navigate(`/customer/beri-rating/${order.trip_id}`)}
+							className="w-full py-4 rounded-2xl border-2 border-indigo-100 hover:bg-indigo-50 text-indigo-900 font-black text-sm uppercase tracking-widest transition-all active:scale-[0.99] flex items-center justify-center gap-2"
+						>
+							<Star size={16} /> Berikan Penilaian (Opsional)
+						</button>
+					)}
 				</div>
 			</div>
 		</CustomerLayout>

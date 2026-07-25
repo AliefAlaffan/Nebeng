@@ -619,11 +619,10 @@ export default function PerjalananCustomer() {
 						</div>
 
 						{/* ACTION BUTTON */}
-						{/* ACTION BUTTON */}
 						{tripStatus === "completed" && (
 							<div className="pt-4 sticky bottom-0 bg-white space-y-3">
 								<button
-									onClick={() => navigate(`/customer/beri-rating/${tripId}`)}
+									onClick={() => navigate("/customer/dashboard")}
 									className="
 										w-full py-4.5 rounded-2xl
 										font-black text-sm uppercase tracking-widest
@@ -634,23 +633,23 @@ export default function PerjalananCustomer() {
 										hover:bg-indigo-800
 									"
 								>
-									<Navigation size={16} className="transform rotate-45" />
-									Berikan Penilaian
+									Kembali ke Halaman Utama
 								</button>
 
 								<button
-									onClick={() => navigate("/customer/dashboard")}
+									onClick={() => navigate(`/customer/beri-rating/${tripId}`)}
 									className="
-										w-full py-4.5 rounded-2xl
+										w-full py-4 rounded-2xl
 										font-black text-sm uppercase tracking-widest
-										text-white transition-all duration-300
+										text-indigo-900 transition-all duration-300
 										flex items-center justify-center gap-3
 										active:scale-[0.98]
-										shadow-xl bg-emerald-500 shadow-emerald-100
-										hover:bg-emerald-600
+										border-2 border-indigo-100
+										hover:bg-indigo-50
 									"
 								>
-									Kembali ke Menu Utama
+									<Navigation size={16} className="transform rotate-45" />
+									Berikan Penilaian (Opsional)
 								</button>
 							</div>
 						)}
