@@ -4,6 +4,7 @@ import { ChevronLeft, CheckCircle2, XCircle, ScanLine, Loader2, RefreshCw, Camer
 import { Html5Qrcode } from "html5-qrcode";
 
 const READER_ID = "reader";
+const AUTO_RESUME_MS = 3000;
 
 export default function Scan() {
 	const [cameraStatus, setCameraStatus] = useState("idle"); // idle | starting | active | denied
@@ -16,6 +17,70 @@ export default function Scan() {
 
 	const html5QrCodeRef = useRef(null);
 	const fileInputRef = useRef(null);
+	const autoResumeTimerRef = useRef(null);
+
+	// ================= KAMERA =================
+	const stopCamera = async () => {
+		const instance = html5QrCodeRef.current;
+		if (instance) {
+			try {
+				const state = instance.getState?.();
+				if (state === 2 /* SCANNING */) {
+					await instance.stop();
+				}
+				await instance.clear();
+			} catch {
+				// kamera memang sudah tidak aktif, aman diabaikan
+			}
+		}
+		setCameraStatus("idle");
+	};
+
+	const startCamera = async () => {
+		setError("");
+		setSuccess(false);
+		setCameraStatus("starting");
+
+		try {
+			const html5QrCode = new Html5Qrcode(READER_ID);
+			html5QrCodeRef.current = html5QrCode;
+
+			await html5QrCode.start(
+				{ facingMode: "environment" },
+				{ fps: 10, qrbox: { width: 250, height: 250 } },
+				async (decodedText) => {
+					await stopCamera();
+					handleDecodedText(decodedText);
+				},
+				() => {
+					// frame tanpa QR terbaca, abaikan - ini normal, terjadi tiap frame
+				},
+			);
+
+			setCameraStatus("active");
+		} catch (err) {
+			console.error(err);
+			setCameraStatus("denied");
+			setError("Tidak bisa mengakses kamera. Pastikan izin kamera sudah diizinkan di browser, lalu coba lagi.");
+		}
+	};
+
+	// Setelah hasil scan (sukses/gagal) ditampilkan, otomatis bersihkan
+	// notifikasi & nyalakan kamera lagi setelah beberapa detik - supaya
+	// petugas Pos Mitra bisa langsung lanjut scan QR berikutnya tanpa
+	// perlu menekan tombol apa pun.
+	const scheduleAutoResume = () => {
+		if (autoResumeTimerRef.current) {
+			clearTimeout(autoResumeTimerRef.current);
+		}
+
+		autoResumeTimerRef.current = setTimeout(() => {
+			setSuccess(false);
+			setError("");
+			setScanResult(null);
+			startCamera();
+		}, AUTO_RESUME_MS);
+	};
 
 	// ================= PROSES HASIL SCAN (kamera atau upload gambar) =================
 	const handleDecodedText = async (decodedText) => {
@@ -27,6 +92,7 @@ export default function Scan() {
 			parsedQR = JSON.parse(decodedText);
 		} catch {
 			setError("Format QR tidak valid");
+			scheduleAutoResume();
 			return;
 		}
 
@@ -78,52 +144,7 @@ export default function Scan() {
 			setError(err.message);
 		} finally {
 			setLoading(false);
-		}
-	};
-
-	// ================= KAMERA =================
-	const stopCamera = async () => {
-		const instance = html5QrCodeRef.current;
-		if (instance) {
-			try {
-				const state = instance.getState?.();
-				if (state === 2 /* SCANNING */) {
-					await instance.stop();
-				}
-				await instance.clear();
-			} catch {
-				// kamera memang sudah tidak aktif, aman diabaikan
-			}
-		}
-		setCameraStatus("idle");
-	};
-
-	const startCamera = async () => {
-		setError("");
-		setSuccess(false);
-		setCameraStatus("starting");
-
-		try {
-			const html5QrCode = new Html5Qrcode(READER_ID);
-			html5QrCodeRef.current = html5QrCode;
-
-			await html5QrCode.start(
-				{ facingMode: "environment" },
-				{ fps: 10, qrbox: { width: 250, height: 250 } },
-				async (decodedText) => {
-					await stopCamera();
-					handleDecodedText(decodedText);
-				},
-				() => {
-					// frame tanpa QR terbaca, abaikan - ini normal, terjadi tiap frame
-				},
-			);
-
-			setCameraStatus("active");
-		} catch (err) {
-			console.error(err);
-			setCameraStatus("denied");
-			setError("Tidak bisa mengakses kamera. Pastikan izin kamera sudah diizinkan di browser, lalu coba lagi.");
+			scheduleAutoResume();
 		}
 	};
 
@@ -145,20 +166,30 @@ export default function Scan() {
 			console.error(err);
 			setError("QR tidak terbaca dari gambar ini. Coba foto yang lebih jelas dan terang.");
 			setLoading(false);
+			scheduleAutoResume();
 		} finally {
 			e.target.value = "";
 		}
 	};
 
+	// Tombol manual: tetap disediakan buat yang mau langsung lanjut scan
+	// tanpa menunggu 3 detik, tidak wajib dipencet.
 	const handleReset = async () => {
-		await stopCamera();
+		if (autoResumeTimerRef.current) {
+			clearTimeout(autoResumeTimerRef.current);
+		}
+
 		setError("");
 		setSuccess(false);
 		setScanResult(null);
+		await startCamera();
 	};
 
 	useEffect(() => {
 		return () => {
+			if (autoResumeTimerRef.current) {
+				clearTimeout(autoResumeTimerRef.current);
+			}
 			stopCamera();
 		};
 	}, []);
@@ -196,7 +227,7 @@ export default function Scan() {
 						<div id={READER_ID} className="w-full" />
 
 						{/* State: belum aktifkan kamera sama sekali */}
-						{cameraStatus === "idle" && !success && (
+						{cameraStatus === "idle" && !success && !error && (
 							<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
 								<div className="p-4 bg-indigo-50 text-indigo-600 rounded-full">
 									<Camera size={32} />
@@ -246,7 +277,9 @@ export default function Scan() {
 						</button>
 					)}
 
-					{/* FEEDBACK NOTIFIKASI STATUS */}
+					{/* FEEDBACK NOTIFIKASI STATUS - otomatis hilang & kamera nyala lagi
+					sendiri dalam 3 detik, tombol di bawah cuma opsi kalau mau langsung
+					lanjut tanpa menunggu */}
 
 					{/* Status Sukses */}
 					{success && (
@@ -258,6 +291,7 @@ export default function Scan() {
 								<div className="space-y-0.5">
 									<p className="font-black text-emerald-800 text-sm uppercase tracking-wide">{successMessage}</p>
 									<p className="text-xs text-emerald-600 font-medium leading-relaxed">{successDescription}</p>
+									<p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest pt-1">Kamera aktif lagi otomatis dalam 3 detik...</p>
 								</div>
 							</div>
 
@@ -265,7 +299,7 @@ export default function Scan() {
 								onClick={handleReset}
 								className="w-full py-4 bg-indigo-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
 							>
-								<RefreshCw size={16} /> Scan Lagi
+								<RefreshCw size={16} /> Scan Sekarang
 							</button>
 						</div>
 					)}
@@ -280,6 +314,7 @@ export default function Scan() {
 								<div className="space-y-0.5">
 									<p className="font-black text-red-800 text-sm uppercase tracking-wide">Proses Scan Gagal</p>
 									<p className="text-xs text-red-600 font-medium leading-relaxed">{error}</p>
+									<p className="text-[10px] text-red-500 font-bold uppercase tracking-widest pt-1">Kamera aktif lagi otomatis dalam 3 detik...</p>
 								</div>
 							</div>
 
@@ -287,7 +322,7 @@ export default function Scan() {
 								onClick={handleReset}
 								className="w-full py-4 bg-indigo-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
 							>
-								<RefreshCw size={16} /> Scan Ulang Kembali
+								<RefreshCw size={16} /> Scan Sekarang
 							</button>
 						</div>
 					)}
