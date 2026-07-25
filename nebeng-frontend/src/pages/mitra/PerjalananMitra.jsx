@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
-import { MapPin, MessageCircle, ChevronLeft, Navigation, CheckCircle2, Clock3, ChevronUp, ChevronDown, Milestone, Maximize2, Crosshair } from "lucide-react";
+import { MapPin, MessageCircle, ChevronLeft, Navigation, CheckCircle2, Clock3, ChevronUp, ChevronDown, Milestone, Maximize2, Crosshair, QrCode } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import QRCode from "react-qr-code";
@@ -108,7 +108,7 @@ const STATUS_CONFIG = {
 
 	arrived_destination: {
 		badge: "Sudah Sampai",
-		button: "Lihat Detail Tebengan",
+		button: "Tampilkan QR",
 		next: null,
 	},
 
@@ -133,6 +133,13 @@ export default function PerjalananMitra() {
 	const [confirmingPaymentId, setConfirmingPaymentId] = useState(null);
 	const [departureQR, setDepartureQR] = useState(null);
 	const [loadingQR, setLoadingQR] = useState(false);
+
+	// QR KEDATANGAN (arrival) - supaya mitra tidak perlu pindah ke halaman
+	// Detail Tebengan hanya untuk menampilkan QR ini.
+	const [showArrivalQR, setShowArrivalQR] = useState(false);
+	const [arrivalQR, setArrivalQR] = useState(null);
+	const [loadingArrivalQR, setLoadingArrivalQR] = useState(false);
+	const [tripCompleted, setTripCompleted] = useState(false);
 
 	const [originPoint, setOriginPoint] = useState(null);
 	const [destinationPoint, setDestinationPoint] = useState(null);
@@ -316,10 +323,58 @@ export default function PerjalananMitra() {
 		}
 	};
 
+	// ================= QR KEDATANGAN (ditampilkan langsung di halaman ini) =================
+	const handleGenerateArrivalQR = async () => {
+		try {
+			setLoadingArrivalQR(true);
+
+			const token = localStorage.getItem("token");
+
+			const response = await fetch(`http://127.0.0.1:8000/api/mitra/trips/${tripId}/generate-qr`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${token}`,
+					Accept: "application/json",
+				},
+			});
+
+			const data = await response.json();
+
+			console.log("ARRIVAL QR:", data);
+
+			if (!response.ok) {
+				alert(data.message || "Gagal membuat QR.");
+				return;
+			}
+
+			setArrivalQR(data);
+			setShowArrivalQR(true);
+		} catch (err) {
+			console.error(err);
+		} finally {
+			setLoadingArrivalQR(false);
+		}
+	};
+
+	// Begitu Pos Mitra scan QR kedatangan ini, polling 5 detik di atas akan
+	// mendeteksi tripStatus berubah jadi "completed" -> modal QR otomatis
+	// tertutup dan notifikasi sukses muncul, tanpa mitra perlu pindah halaman.
+	useEffect(() => {
+		if (showArrivalQR && tripStatus === "completed") {
+			setShowArrivalQR(false);
+			setTripCompleted(true);
+		}
+	}, [tripStatus, showArrivalQR]);
+
 	const handleStatusAction = async () => {
 		// ===============================
-		// KHUSUS SUDAH SAMPAI TUJUAN
+		// KHUSUS SUDAH SAMPAI TUJUAN -> LANGSUNG TAMPILKAN QR DI HALAMAN INI
 		// ===============================
+		if (tripStatus === "arrived_destination") {
+			handleGenerateArrivalQR();
+			return;
+		}
+
 		if (tripStatus === "waiting_departure") {
 			try {
 				setLoadingQR(true);
@@ -351,11 +406,6 @@ export default function PerjalananMitra() {
 				setLoadingQR(false);
 			}
 
-			return;
-		}
-
-		if (tripStatus === "arrived_destination") {
-			navigate(`/mitra/detail-tebengan/${tripId}`);
 			return;
 		}
 
@@ -627,13 +677,17 @@ export default function PerjalananMitra() {
 								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer scan QR kedatangan di Pos Mitra sebelum bisa berangkat.</p>
 							)}
 
+							{tripStatus === "arrived_destination" && (
+								<p className="text-xs text-center font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-2xl py-3 px-4">Tunjukkan QR di bawah ini kepada petugas Pos Mitra untuk menyelesaikan perjalanan.</p>
+							)}
+
 							<button
-								onClick={handleStatusAction}
-								disabled={tripStatus === "completed" || (tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready")))}
+								onClick={tripStatus === "completed" ? () => navigate("/mitra/dashboard") : handleStatusAction}
+								disabled={loadingArrivalQR || (tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready")))}
 								className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] shadow-xl
             ${
 							tripStatus === "completed"
-								? "bg-emerald-500 shadow-emerald-100"
+								? "bg-emerald-500 shadow-emerald-100 hover:bg-emerald-600"
 								: tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready"))
 								? "bg-gray-300 shadow-none cursor-not-allowed"
 								: "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"
@@ -643,7 +697,12 @@ export default function PerjalananMitra() {
 								{tripStatus === "completed" ? (
 									<>
 										<CheckCircle2 size={18} />
-										Perjalanan Selesai
+										Kembali ke Beranda
+									</>
+								) : tripStatus === "arrived_destination" ? (
+									<>
+										<QrCode size={18} />
+										{loadingArrivalQR ? "Membuat QR..." : "Tampilkan QR"}
 									</>
 								) : (
 									<>
@@ -652,6 +711,13 @@ export default function PerjalananMitra() {
 									</>
 								)}
 							</button>
+
+							{/* LINK KE HALAMAN DETAIL (opsional, tetap tersedia) */}
+							{tripStatus === "arrived_destination" && (
+								<button onClick={() => navigate(`/mitra/detail-tebengan/${tripId}`)} className="w-full py-3 rounded-2xl bg-white border border-gray-100 text-gray-500 font-bold text-xs uppercase tracking-widest hover:bg-gray-50 transition-all">
+									Lihat Detail Tebengan
+								</button>
+							)}
 
 							{/* BUTTON RATING CUSTOMER */}
 							{tripStatus === "completed" && customers.length > 0 && (
@@ -719,7 +785,43 @@ export default function PerjalananMitra() {
 				</div>
 			)}
 
+			{/* QR KEDATANGAN - langsung ditampilkan di halaman ini, tanpa pindah halaman */}
+			{showArrivalQR && (
+				<div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+					<div className="bg-white rounded-3xl p-6 w-full max-w-sm text-center space-y-5">
+						<h2 className="text-xl font-black text-indigo-900">QR Perjalanan</h2>
+
+						<p className="text-sm text-gray-500">Tunjukkan QR ini kepada Pos Mitra untuk menyelesaikan perjalanan.</p>
+
+						<div className="bg-white p-4 rounded-2xl flex justify-center">
+							{arrivalQR && (
+								<QRCode
+									value={JSON.stringify({
+										type: "trip",
+										token: arrivalQR.token,
+									})}
+									size={220}
+								/>
+							)}
+						</div>
+
+						{arrivalQR?.expired_at && (
+							<div>
+								<p className="text-xs text-gray-400 font-medium">Berlaku hingga</p>
+								<p className="font-black text-indigo-900 mt-1">{new Date(arrivalQR.expired_at).toLocaleString()}</p>
+							</div>
+						)}
+
+						<button onClick={() => setShowArrivalQR(false)} className="w-full py-3 rounded-2xl bg-gray-100 font-black">
+							Tutup
+						</button>
+					</div>
+				</div>
+			)}
+
 			<SuccessPopup show={departureVerified} onClose={() => setDepartureVerified(false)} title="Perjalanan Dimulai" message="QR keberangkatan berhasil diverifikasi Pos Mitra. Selamat menempuh perjalanan." />
+
+			<SuccessPopup show={tripCompleted} onClose={() => setTripCompleted(false)} title="Perjalanan Selesai" message="QR berhasil diverifikasi Pos Mitra. Perjalanan ini telah selesai." />
 		</MitraLayout>
 	);
 }

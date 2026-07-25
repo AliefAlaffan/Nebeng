@@ -60,10 +60,79 @@ export default function Dashboard() {
 	// Gabungan: reward points + 5 aktivitas terbaru dalam 1 request
 	// (sebelumnya ini 2 fetch terpisah ke endpoint berbeda)
 	useEffect(() => {
-		const fetchSummary = async () => {
-			try {
-				const token = localStorage.getItem("token");
+		const formatActivities = (orders) =>
+			(orders || []).slice(0, 5).map((order) => {
+				const vehicleType = order.trip?.vehicle_type || order.vehicle_type || order.type;
 
+				let type = vehicleType || "Perjalanan";
+				let icon = Bike;
+
+				const normalizedType = vehicleType?.toLowerCase() || "";
+
+				if (normalizedType.includes("barang")) {
+					type = "Nebeng Barang";
+					icon = Package;
+				} else if (normalizedType.includes("motor")) {
+					type = "Nebeng Motor";
+					icon = Bike;
+				} else if (normalizedType.includes("mobil")) {
+					type = "Nebeng Mobil";
+					icon = Car;
+				}
+
+				const departureDate = order.trip?.departure_date;
+				const departureTime = order.trip?.departure_time;
+
+				let formattedDate = "-";
+
+				if (departureDate && departureTime) {
+					formattedDate = new Date(`${departureDate}T${departureTime}`).toLocaleDateString("id-ID", {
+						day: "2-digit",
+						month: "short",
+					});
+				}
+
+				return {
+					id: order.id,
+					type,
+					icon,
+					price: Number(order.price || 0).toLocaleString(),
+					date: formattedDate,
+				};
+			});
+
+		// Fallback kalau endpoint gabungan /dashboard-summary bermasalah
+		// (mis. 404 karena route belum ke-refresh di server) - supaya
+		// dashboard tidak diam-diam nampilin 0 padahal poinnya sebenarnya ada.
+		const fetchSummaryFallback = async (token) => {
+			try {
+				const [pointsRes, historyRes] = await Promise.all([
+					fetch("http://127.0.0.1:8000/api/reward-points", {
+						headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+					}),
+					fetch("http://127.0.0.1:8000/api/orders/history", {
+						headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+					}),
+				]);
+
+				if (pointsRes.ok) {
+					const pointsData = await pointsRes.json();
+					setRewardPoints(pointsData.reward_points || 0);
+				}
+
+				if (historyRes.ok) {
+					const historyData = await historyRes.json();
+					setRecentActivities(formatActivities(historyData));
+				}
+			} catch (err) {
+				console.error("Fallback dashboard summary error:", err);
+			}
+		};
+
+		const fetchSummary = async () => {
+			const token = localStorage.getItem("token");
+
+			try {
 				const res = await fetch("http://127.0.0.1:8000/api/dashboard-summary", {
 					headers: {
 						Authorization: `Bearer ${token}`,
@@ -71,53 +140,20 @@ export default function Dashboard() {
 					},
 				});
 
+				if (!res.ok) {
+					// endpoint gabungan gagal (mis. 404) -> jangan diam-diam
+					// tampilkan 0, coba ambil datanya lewat endpoint terpisah.
+					await fetchSummaryFallback(token);
+					return;
+				}
+
 				const data = await res.json();
 
 				setRewardPoints(data.reward_points || 0);
-
-				const formatted = (data.recent_activities || []).map((order) => {
-					const vehicleType = order.trip?.vehicle_type || order.vehicle_type || order.type;
-
-					let type = vehicleType || "Perjalanan";
-					let icon = Bike;
-
-					const normalizedType = vehicleType?.toLowerCase() || "";
-
-					if (normalizedType.includes("barang")) {
-						type = "Nebeng Barang";
-						icon = Package;
-					} else if (normalizedType.includes("motor")) {
-						type = "Nebeng Motor";
-						icon = Bike;
-					} else if (normalizedType.includes("mobil")) {
-						type = "Nebeng Mobil";
-						icon = Car;
-					}
-
-					const departureDate = order.trip?.departure_date;
-					const departureTime = order.trip?.departure_time;
-
-					let formattedDate = "-";
-
-					if (departureDate && departureTime) {
-						formattedDate = new Date(`${departureDate}T${departureTime}`).toLocaleDateString("id-ID", {
-							day: "2-digit",
-							month: "short",
-						});
-					}
-
-					return {
-						id: order.id,
-						type,
-						icon,
-						price: Number(order.price || 0).toLocaleString(),
-						date: formattedDate,
-					};
-				});
-
-				setRecentActivities(formatted);
+				setRecentActivities(formatActivities(data.recent_activities));
 			} catch (err) {
 				console.error(err);
+				await fetchSummaryFallback(token);
 			}
 		};
 

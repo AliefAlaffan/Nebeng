@@ -136,8 +136,8 @@ export default function UploadBuktiPembayaran() {
 							</div>
 							<h2 className="text-xl font-black text-gray-800 mb-2">Menunggu Konfirmasi Mitra</h2>
 							<p className="text-sm text-gray-500 leading-relaxed mb-8">Bukti pembayaran kamu sudah terkirim. Mitra akan memeriksa dan mengonfirmasi pembayaran ini sebelum perjalanan dimulai.</p>
-							<button onClick={() => navigate("/customer/riwayat")} className="w-full py-4 rounded-2xl bg-indigo-900 text-white font-black">
-								Lihat Riwayat Pesanan
+							<button onClick={() => navigate(`/customer/perjalanan/${order.trip_id}`)} className="w-full py-4 rounded-2xl bg-indigo-900 text-white font-black">
+								Lanjut ke Perjalanan
 							</button>
 						</div>
 					)

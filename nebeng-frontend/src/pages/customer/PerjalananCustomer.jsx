@@ -621,7 +621,7 @@ export default function PerjalananCustomer() {
 						{/* ACTION BUTTON */}
 						{/* ACTION BUTTON */}
 						{tripStatus === "completed" && (
-							<div className="pt-4 sticky bottom-0 bg-white">
+							<div className="pt-4 sticky bottom-0 bg-white space-y-3">
 								<button
 									onClick={() => navigate(`/customer/beri-rating/${tripId}`)}
 									className="
@@ -636,6 +636,21 @@ export default function PerjalananCustomer() {
 								>
 									<Navigation size={16} className="transform rotate-45" />
 									Berikan Penilaian
+								</button>
+
+								<button
+									onClick={() => navigate("/customer/dashboard")}
+									className="
+										w-full py-4.5 rounded-2xl
+										font-black text-sm uppercase tracking-widest
+										text-white transition-all duration-300
+										flex items-center justify-center gap-3
+										active:scale-[0.98]
+										shadow-xl bg-emerald-500 shadow-emerald-100
+										hover:bg-emerald-600
+									"
+								>
+									Kembali ke Menu Utama
 								</button>
 							</div>
 						)}
