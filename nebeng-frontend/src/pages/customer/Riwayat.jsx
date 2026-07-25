@@ -5,15 +5,12 @@ import { Link, useNavigate } from "react-router-dom";
 
 export default function Riwayat() {
 	const [historyData, setHistoryData] = useState([]);
-	// Default "Semua" supaya order yang baru dipesan (Dalam Proses) langsung
-	// kelihatan, tidak ketutup di balik tab lain
 	const [activeTab, setActiveTab] = useState("Semua");
 	const [filter, setFilter] = useState("Semua");
 	const [searchTerm, setSearchTerm] = useState("");
 
 	const navigate = useNavigate();
 
-	// Tab sekarang murni filter status, bukan pemisah kategori terpisah
 	const tabs = ["Semua", "Dalam Proses", "Selesai"];
 	const filters = ["Semua", "Motor", "Mobil", "Barang"];
 
@@ -78,10 +75,11 @@ export default function Riwayat() {
 
 					const departureDateTime = `${order.trip?.departure_date}T${order.trip?.departure_time}`;
 
-					// Status mentah dari backend: waiting_departure, on_the_way,
-					// arrived_destination, completed, cancelled -> disederhanakan
-					// jadi 3 kelompok tampilan: Selesai / Dibatalkan / Dalam Proses
-					const statusGroup = order.status === "completed" ? "Selesai" : order.status === "cancelled" ? "Dibatalkan" : "Dalam Proses";
+					// Status "Selesai" harus mencerminkan perjalanan yang benar-benar
+					// sudah selesai (trip.status === "completed"), bukan order.status
+					// yang selama ini selalu "completed" sejak order dibuat.
+					const isCancelled = order.status === "cancelled";
+					const isTripCompleted = order.trip?.status === "completed";
 
 					return {
 						id: order.id,
@@ -90,9 +88,11 @@ export default function Riwayat() {
 						category,
 						icon,
 
-						status: statusGroup,
+						tab: isTripCompleted || isCancelled ? "Selesai" : "Dalam Proses",
 
-						statusColor: statusGroup === "Selesai" ? "text-emerald-500" : statusGroup === "Dibatalkan" ? "text-red-500" : "text-amber-500",
+						status: isCancelled ? "Dibatalkan" : isTripCompleted ? "Selesai" : "Dalam Proses",
+
+						statusColor: isCancelled ? "text-red-500" : isTripCompleted ? "text-emerald-500" : "text-amber-500",
 
 						from: order.trip?.origin_point?.city?.name || "-",
 						fromPos: order.trip?.origin_point?.pos_name || "-",
@@ -130,11 +130,7 @@ export default function Riwayat() {
 	// =============================
 	const filteredData = useMemo(() => {
 		return historyData.filter((item) => {
-			// "Semua" -> tampilkan semua status. Selain itu, cocokkan
-			// langsung ke teks status ("Dalam Proses" / "Selesai").
-			// Order yang "Dibatalkan" tetap muncul di tab Semua, tapi
-			// tidak masuk ke tab Dalam Proses maupun Selesai.
-			const matchesTab = activeTab === "Semua" || item.status === activeTab;
+			const matchesTab = activeTab === "Semua" || item.tab === activeTab;
 
 			const matchesFilter = filter === "Semua" || item.category === filter;
 
@@ -160,7 +156,7 @@ export default function Riwayat() {
 
 						<div className="flex bg-gray-50 p-1.5 rounded-2xl overflow-x-auto">
 							{tabs.map((tab) => (
-								<button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap ${activeTab === tab ? "bg-white text-indigo-900 shadow-md" : "text-gray-400"}`}>
+								<button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2.5 rounded-xl text-sm font-bold ${activeTab === tab ? "bg-white text-indigo-900 shadow-md" : "text-gray-400"}`}>
 									{tab}
 								</button>
 							))}

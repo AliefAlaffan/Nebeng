@@ -69,17 +69,27 @@ class TripJourneyController extends Controller
     // =============================
     public function latestLocation($id)
     {
+        $trip = Trip::find($id);
+
         $latestTracking = TripTracking::where('trip_id', $id)
             ->latest('tracked_at')
             ->first();
 
         if (!$latestTracking) {
+            // Tetap kirim status trip walau belum ada data GPS,
+            // supaya status di sisi customer tetap ter-update.
             return response()->json([
-                'message' => 'Belum ada tracking'
+                'message' => 'Belum ada tracking',
+                'trip_status' => $trip->status ?? null,
             ], 404);
         }
 
-        return response()->json($latestTracking);
+        return response()->json([
+            'latitude' => $latestTracking->latitude,
+            'longitude' => $latestTracking->longitude,
+            'tracked_at' => $latestTracking->tracked_at,
+            'trip_status' => $trip->status ?? null,
+        ]);
     }
 
     // =============================
@@ -119,6 +129,21 @@ class TripJourneyController extends Controller
         ) {
             return response()->json([
                 'message' => 'Belum ada customer yang memesan tebengan ini. Tunggu hingga ada pesanan sebelum berangkat.'
+            ], 422);
+        }
+
+        // =====================================
+        // CEGAH KEBERANGKATAN SEBELUM CUSTOMER CHECK-IN
+        // =====================================
+        // Customer wajib scan QR kedatangan di Pos Mitra (readiness_status
+        // menjadi "ready") sebelum mitra diperbolehkan berangkat.
+        if (
+            $request->status === 'waiting_departure' &&
+            $trip->orders->count() > 0 &&
+            $trip->orders->contains(fn ($order) => $order->readiness_status !== 'ready')
+        ) {
+            return response()->json([
+                'message' => 'Masih ada customer yang belum scan QR kedatangan di Pos Mitra. Tunggu hingga semua customer check-in sebelum berangkat.'
             ], 422);
         }
 

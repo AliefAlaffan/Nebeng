@@ -88,4 +88,34 @@ class ProfileController extends Controller
             'user' => $user->load('profile')
         ]);
     }
+
+    // ===============================
+    // UPLOAD / GANTI QRIS MITRA
+    // ===============================
+    public function uploadQris(Request $request)
+    {
+        $request->validate([
+            'qris_image' => 'required|image|max:4096',
+        ]);
+
+        $user = $request->user();
+
+        $profile = $user->profile;
+
+        if ($profile && $profile->qris_image) {
+            Storage::disk('public')->delete($profile->qris_image);
+        }
+
+        $path = $request->file('qris_image')->store('qris', 'public');
+
+        UserProfile::updateOrCreate(
+            ['user_id' => $user->id],
+            ['qris_image' => $path]
+        );
+
+        return response()->json([
+            'message' => 'QRIS berhasil disimpan',
+            'qris_image' => $path,
+        ]);
+    }
 }

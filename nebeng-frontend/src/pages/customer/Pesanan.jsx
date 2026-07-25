@@ -72,8 +72,11 @@ export default function Pesanan() {
 	}
 
 	const departureDateTime = `${order.trip?.departure_date}T${order.trip?.departure_time}`;
-	const isCompleted = order.status === "completed";
-	const isCancelled = order.status === "cancelled";
+
+	// Status harus mencerminkan progres perjalanan sesungguhnya (trip.status),
+	// bukan order.status yang selalu "completed" sejak order dibuat.
+	const isCompleted = order.trip?.status === "completed";
+	const isCancelled = order.status === "cancelled" || order.trip?.status === "cancelled";
 	const canTrackJourney = !isCompleted && !isCancelled;
 
 	return (

@@ -22,6 +22,8 @@ class UserProfile extends Model
         'bank_name',
         'bank_account_name',
         'bank_account_number',
+
+        'qris_image',
     ];
 
     protected $casts = [

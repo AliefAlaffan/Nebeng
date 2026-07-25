@@ -130,6 +130,7 @@ export default function PerjalananMitra() {
 
 	const [showDepartureQR, setShowDepartureQR] = useState(false);
 	const [departureVerified, setDepartureVerified] = useState(false);
+	const [confirmingPaymentId, setConfirmingPaymentId] = useState(null);
 	const [departureQR, setDepartureQR] = useState(null);
 	const [loadingQR, setLoadingQR] = useState(false);
 
@@ -173,6 +174,7 @@ export default function PerjalananMitra() {
 				if (data.orders?.length > 0) {
 					const formattedCustomers = data.orders.map((order) => ({
 						id: order.user?.id,
+						orderId: order.id,
 						name: order.user?.name || `Customer #${order.customer_id}`,
 
 						photo: order.user?.avatar ? `http://127.0.0.1:8000/storage/${order.user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.user?.name || "Customer"}`,
@@ -180,6 +182,12 @@ export default function PerjalananMitra() {
 						phone: order.user?.phone || "",
 
 						type: data.vehicle_type === "barang" ? "Pengirim Barang" : "Penumpang Perjalanan",
+
+						paymentMethod: order.payment_method,
+						paymentStatus: order.payment_status,
+						paymentProof: order.payment_proof,
+
+						readinessStatus: order.readiness_status,
 					}));
 
 					setCustomers(formattedCustomers);
@@ -278,6 +286,35 @@ export default function PerjalananMitra() {
 
 		setActiveRoute(slicedRoute);
 	}, [currentPosition, routePath]);
+
+	const handleConfirmPayment = async (orderId) => {
+		if (!orderId) return;
+
+		setConfirmingPaymentId(orderId);
+
+		try {
+			const response = await fetch(`http://127.0.0.1:8000/api/orders/${orderId}/confirm-payment`, {
+				method: "POST",
+				headers: {
+					Authorization: "Bearer " + localStorage.getItem("token"),
+				},
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				alert(data.message || "Gagal mengonfirmasi pembayaran.");
+				return;
+			}
+
+			setCustomers((prev) => prev.map((c) => (c.orderId === orderId ? { ...c, paymentStatus: "paid" } : c)));
+		} catch (err) {
+			console.error(err);
+			alert("Terjadi kesalahan saat mengonfirmasi pembayaran.");
+		} finally {
+			setConfirmingPaymentId(null);
+		}
+	};
 
 	const handleStatusAction = async () => {
 		// ===============================
@@ -468,36 +505,76 @@ export default function PerjalananMitra() {
 							<h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Customer Perjalanan</h3>
 
 							{customers.length > 0 ? (
-								customers.map((customer) => (
-									<div key={customer.id} className="bg-indigo-50/50 border border-indigo-50 rounded-3xl p-4 flex items-center justify-between">
-										<div className="flex items-center gap-4 min-w-0">
-											<img src={customer.photo} alt={customer.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md shrink-0 bg-white" />
+					customers.map((customer) => (
+						<div key={customer.id} className="space-y-2">
+							<div className="bg-indigo-50/50 border border-indigo-50 rounded-3xl p-4 flex items-center justify-between">
+								<div className="flex items-center gap-4 min-w-0">
+									<img src={customer.photo} alt={customer.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md shrink-0 bg-white" />
 
-											<div className="min-w-0">
-												<h2 className="font-black text-gray-800 text-base truncate">{customer.name}</h2>
+									<div className="min-w-0">
+										<h2 className="font-black text-gray-800 text-base truncate">{customer.name}</h2>
 
-												<span className="inline-block mt-0.5 bg-indigo-900 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md">{customer.type}</span>
-											</div>
-										</div>
+										<span className="inline-block mt-0.5 bg-indigo-900 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md">{customer.type}</span>
+									</div>
+								</div>
 
-										<div className="shrink-0">
+								<div className="shrink-0">
+									<button
+										onClick={() => navigate("/mitra/pesan-mitra")}
+										className="w-11 h-11 rounded-xl bg-indigo-900 text-white flex items-center justify-center shadow-md hover:bg-indigo-800 transition-all active:scale-95"
+									>
+										<MessageCircle size={18} />
+									</button>
+								</div>
+							</div>
+
+							{customer.paymentMethod && (
+								<div className="bg-white border border-gray-100 rounded-3xl p-4">
+									{customer.paymentStatus === "paid" ? (
+										<p className="text-xs font-black text-emerald-600">
+											✓ Pembayaran {customer.paymentMethod === "cash" ? "tunai" : "QRIS"} sudah dikonfirmasi
+										</p>
+									) : customer.paymentMethod === "cash" ? (
+										// TUNAI: cukup klik konfirmasi setelah uang diterima, tidak perlu bukti foto
+										<div className="space-y-3">
+											<p className="text-xs font-black text-gray-500 uppercase tracking-wide">Pembayaran Tunai</p>
+											<p className="text-[11px] text-gray-400">Klik tombol di bawah setelah kamu menerima uang tunai dari customer ini.</p>
+
 											<button
-												onClick={() => navigate("/mitra/pesan-mitra")}
-												className="
-			w-11 h-11 rounded-xl
-			bg-indigo-900 text-white
-			flex items-center justify-center
-			shadow-md
-			hover:bg-indigo-800
-			transition-all
-			active:scale-95
-		"
+												onClick={() => handleConfirmPayment(customer.orderId)}
+												disabled={confirmingPaymentId === customer.orderId}
+												className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
 											>
-												<MessageCircle size={18} />
+												{confirmingPaymentId === customer.orderId ? "Memproses..." : "Konfirmasi Sudah Terima Uang"}
 											</button>
 										</div>
-									</div>
-								))
+									) : customer.paymentStatus === "waiting_confirmation" ? (
+										<div className="space-y-3">
+											<p className="text-xs font-black text-amber-600 uppercase tracking-wide">Menunggu konfirmasi pembayaran QRIS</p>
+
+											{customer.paymentProof && (
+												<img
+													src={`http://127.0.0.1:8000/storage/${customer.paymentProof}`}
+													alt="Bukti pembayaran"
+													className="w-full max-h-56 object-contain rounded-2xl border border-gray-100 bg-gray-50"
+												/>
+											)}
+
+											<button
+												onClick={() => handleConfirmPayment(customer.orderId)}
+												disabled={confirmingPaymentId === customer.orderId}
+												className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+											>
+												{confirmingPaymentId === customer.orderId ? "Memproses..." : "Konfirmasi Sudah Dibayar"}
+											</button>
+										</div>
+									) : (
+										<p className="text-xs font-bold text-gray-400">Menunggu customer mengupload bukti pembayaran QRIS.</p>
+									)}
+								</div>
+							)}
+						</div>
+					))
 							) : (
 								<div className="bg-gray-50 border border-dashed border-gray-200 rounded-3xl p-6 text-center">
 									<p className="text-sm font-bold text-gray-400">Belum ada customer</p>
@@ -546,11 +623,21 @@ export default function PerjalananMitra() {
 								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer memesan tebengan ini sebelum bisa berangkat.</p>
 							)}
 
+							{tripStatus === "active" && customers.length > 0 && !customers.every((c) => c.readinessStatus === "ready") && (
+								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer scan QR kedatangan di Pos Mitra sebelum bisa berangkat.</p>
+							)}
+
 							<button
 								onClick={handleStatusAction}
-								disabled={tripStatus === "completed" || (tripStatus === "active" && customers.length === 0)}
+								disabled={tripStatus === "completed" || (tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready")))}
 								className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] shadow-xl
-            ${tripStatus === "completed" ? "bg-emerald-500 shadow-emerald-100" : tripStatus === "active" && customers.length === 0 ? "bg-gray-300 shadow-none cursor-not-allowed" : "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"}
+            ${
+							tripStatus === "completed"
+								? "bg-emerald-500 shadow-emerald-100"
+								: tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready"))
+								? "bg-gray-300 shadow-none cursor-not-allowed"
+								: "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"
+						}
         `}
 							>
 								{tripStatus === "completed" ? (

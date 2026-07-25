@@ -119,12 +119,16 @@ export default function KonfirmasiPIN() {
 				localStorage.removeItem("pending_order");
 				localStorage.removeItem("selected_payment_method");
 
-				navigate("/customer/pembayaran-selesai", {
-					state: {
-						order: orderResponse.order,
-						method: selectedMethod.name,
-					},
-				});
+				if (selectedMethod.id === "qris") {
+					navigate(`/customer/upload-bukti-pembayaran/${orderResponse.order.id}`);
+				} else {
+					navigate("/customer/pembayaran-selesai", {
+						state: {
+							order: orderResponse.order,
+							method: selectedMethod.name,
+						},
+					});
+				}
 			} else {
 				alert(orderResponse.message || "Gagal membuat order");
 			}

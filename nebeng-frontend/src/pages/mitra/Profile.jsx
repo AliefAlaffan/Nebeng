@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import {
 	ChevronLeft,
+	Settings, // Digunakan untuk menu Pengaturan
 	User,
 	FileText, // Digunakan untuk menu Dokumen
 	Lock,
@@ -13,6 +14,7 @@ import {
 	ChevronRight,
 	Camera,
 	KeyRound,
+	QrCode,
 } from "lucide-react";
 
 export default function Profile() {
@@ -27,6 +29,14 @@ export default function Profile() {
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
 
 	const accountMenu = [
+		{
+			id: 1,
+			label: "Pengaturan",
+			icon: Settings,
+			color: "text-amber-500",
+			bg: "bg-amber-50",
+			path: "/mitra/settings",
+		},
 		{
 			id: 2,
 			label: "Edit Profil",
@@ -68,11 +78,19 @@ export default function Profile() {
 			bg: "bg-sky-50",
 			path: "/mitra/status-akun",
 		},
+		{
+			id: 9,
+			label: "QRIS Saya",
+			icon: QrCode,
+			color: "text-emerald-600",
+			bg: "bg-emerald-50",
+			path: "/mitra/qris-saya",
+		},
 	];
 
 	const otherMenu = [
-		{ id: 10, label: "Keamanan", icon: ShieldCheck, color: "text-slate-700", bg: "bg-slate-100", path: "/mitra/keamanan" },
-		{ id: 11, label: "Pusat Bantuan", icon: HelpCircle, color: "text-slate-700", bg: "bg-slate-100", path: "/mitra/pusat-bantuan" },
+		{ id: 10, label: "Keamanan", icon: ShieldCheck, color: "text-slate-700", bg: "bg-slate-100" },
+		{ id: 11, label: "Pusat Bantuan", icon: HelpCircle, color: "text-slate-700", bg: "bg-slate-100" },
 	];
 
 	// ===============================
@@ -181,7 +199,7 @@ export default function Profile() {
 							<h3 className="text-xs font-black text-gray-300 uppercase tracking-[0.2em] mb-8">Bantuan & Keamanan</h3>
 							<div className="space-y-2">
 								{otherMenu.map((item) => (
-									<button key={item.id} onClick={() => item.path && navigate(item.path)} className="w-full flex items-center justify-between p-4 rounded-3xl hover:bg-gray-50 transition-all group border border-transparent hover:border-gray-100">
+									<button key={item.id} className="w-full flex items-center justify-between p-4 rounded-3xl hover:bg-gray-50 transition-all group border border-transparent hover:border-gray-100">
 										<div className="flex items-center gap-4">
 											<div className={`p-3 ${item.bg} ${item.color} rounded-2xl shadow-sm`}>
 												<item.icon size={20} />

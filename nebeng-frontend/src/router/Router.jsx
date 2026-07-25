@@ -24,7 +24,6 @@ import ProfileAdmin from "../pages/admin/Profile";
 import EditProfileAdmin from "../pages/admin/EditProfile";
 import AturPasswordAdmin from "../pages/customer/AturPassword";
 import AturHarga from "../pages/admin/PricingManagement";
-import PickupPointManagement from "../pages/admin/PickupPointManagement";
 
 /* CUSTOMER */
 import DashboardCustomer from "../pages/customer/Dashboard";
@@ -46,6 +45,7 @@ import EditProfile from "../pages/customer/EditProfile";
 import Alamat from "../pages/customer/Alamat";
 import Keamanan from "../pages/customer/Keamanan";
 import PusatBantuan from "../pages/customer/PusatBantuan";
+import UploadBuktiPembayaran from "../pages/customer/UploadBuktiPembayaran";
 import AturPIN from "../pages/customer/AturPIN";
 import AturPassword from "../pages/customer/AturPassword";
 import KonfirmasiPIN from "../pages/customer/KonfirmasiPIN";
@@ -63,9 +63,8 @@ import TambahNebengMobil from "../pages/mitra/NebengMobil";
 import TambahNebengBarang from "../pages/mitra/NebengBarang";
 import PesanMitra from "../pages/mitra/Pesan";
 import MitraProfile from "../pages/mitra/Profile";
+import QrisSaya from "../pages/mitra/QrisSaya";
 import MitraRiwayat from "../pages/mitra/Riwayat";
-import KeamananMitra from "../pages/mitra/Keamanan";
-import PusatBantuanMitra from "../pages/mitra/PusatBantuan";
 import StatusAkun from "../pages/mitra/StatusAkun";
 import Dokumen from "../pages/mitra/Dokumen";
 import EditProfileMitra from "../pages/mitra/EditProfile";
@@ -152,15 +151,6 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="admin">
 						<AturHarga />
-					</ProtectedRoute>
-				}
-			/>
-
-			<Route
-				path="/admin/pengaturan/pickup-point"
-				element={
-					<ProtectedRoute role="admin">
-						<PickupPointManagement />
 					</ProtectedRoute>
 				}
 			/>
@@ -415,6 +405,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="customer">
 						<PusatBantuan />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/customer/upload-bukti-pembayaran/:orderId"
+				element={
+					<ProtectedRoute role="customer">
+						<UploadBuktiPembayaran />
 					</ProtectedRoute>
 				}
 			/>
@@ -729,19 +728,10 @@ function AppRouter() {
 			/>
 
 			<Route
-				path="/mitra/keamanan"
+				path="/mitra/qris-saya"
 				element={
 					<ProtectedRoute role="mitra">
-						<KeamananMitra />
-					</ProtectedRoute>
-				}
-			/>
-
-			<Route
-				path="/mitra/pusat-bantuan"
-				element={
-					<ProtectedRoute role="mitra">
-						<PusatBantuanMitra />
+						<QrisSaya />
 					</ProtectedRoute>
 				}
 			/>

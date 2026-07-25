@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, QrCode, Banknote, Wallet, CheckCircle2, Pack
 
 export default function Pembayaran() {
 	const [selectedMethod, setSelectedMethod] = useState(null);
+	const [isProcessing, setIsProcessing] = useState(false);
 	const navigate = useNavigate();
 
 	const [orderData] = useState(() => {
@@ -28,17 +29,78 @@ export default function Pembayaran() {
 		// { id: "dana", name: "Dana", desc: "Bayar menggunakan saldo Dana", icon: Wallet, type: "nontunai" },
 	];
 
-	const handleOrder = () => {
+	const mapPaymentMethod = (methodId) => {
+		switch (methodId) {
+			case "tunai":
+				return "cash";
+			case "qris":
+				return "qris";
+			case "bri":
+			case "bca":
+			case "dana":
+				return "ewallet";
+			default:
+				return "cash";
+		}
+	};
+
+	const handleOrder = async () => {
 		if (!selectedMethod) {
 			alert("Pilih metode pembayaran terlebih dahulu");
 			return;
 		}
 
-		// Simpan metode pembayaran yang dipilih
-		localStorage.setItem("selected_payment_method", JSON.stringify(selectedMethod));
+		// Sementara PIN tidak dipakai di alur pembayaran (baik Tunai maupun QRIS).
+		// Fitur PIN tetap ada (Atur PIN, Konfirmasi PIN) untuk kebutuhan lain,
+		// hanya tidak digunakan di sini dulu.
+		setIsProcessing(true);
 
-		// Arahkan ke halaman konfirmasi PIN
-		navigate("/customer/konfirmasi-pin");
+		try {
+			const token = localStorage.getItem("token");
+
+			const orderRes = await fetch("http://127.0.0.1:8000/api/orders", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Accept: "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({
+					trip_id: orderData.trip_id,
+					pickup_address: orderData.pickup_address,
+					drop_address: orderData.drop_address,
+					payment_method: mapPaymentMethod(selectedMethod.id),
+					price: orderData.price,
+				}),
+			});
+
+			const orderResponse = await orderRes.json();
+
+			if (!orderRes.ok) {
+				throw new Error(orderResponse.message || "Gagal membuat pesanan");
+			}
+
+			localStorage.removeItem("pending_order");
+			localStorage.removeItem("selected_payment_method");
+
+			if (selectedMethod.type === "nontunai") {
+				// QRIS dkk: lanjut upload bukti pembayaran
+				navigate(`/customer/upload-bukti-pembayaran/${orderResponse.order.id}`);
+			} else {
+				// Tunai: pesanan langsung jadi, bayar tunai saat bertemu mitra.
+				// Mitra akan konfirmasi penerimaan uang dari sisi mereka.
+				navigate("/customer/pembayaran-selesai", {
+					state: {
+						order: orderResponse.order,
+						method: selectedMethod.name,
+					},
+				});
+			}
+		} catch (error) {
+			alert(error.message || "Terjadi kesalahan saat membuat pesanan");
+		} finally {
+			setIsProcessing(false);
+		}
 	};
 
 	return (
@@ -140,11 +202,18 @@ export default function Pembayaran() {
 									</div>
 
 									<button
-										className="w-full py-5 bg-indigo-900 text-white rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+										className="w-full py-5 bg-indigo-900 text-white rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60"
 										onClick={handleOrder}
+										disabled={isProcessing}
 									>
-										Lanjutkan {selectedMethod.type === "nontunai" ? "ke Pembayaran" : "Pesanan"}
-										<ArrowRight size={20} />
+										{isProcessing ? (
+											<div className="w-5 h-5 border-2 border-indigo-300 border-t-white rounded-full animate-spin"></div>
+										) : (
+											<>
+												{selectedMethod.type === "nontunai" ? "Lanjutkan ke Pembayaran" : "Buat Pesanan"}
+												<ArrowRight size={20} />
+											</>
+										)}
 									</button>
 
 									<div className="mt-6 flex items-center justify-center gap-2 text-emerald-500">

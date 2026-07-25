@@ -13,6 +13,7 @@ use App\Models\Message;
 use App\Models\DriverBalance;
 use App\Models\BalanceTransaction;
 use App\Events\NewOrderNotification;
+use Illuminate\Support\Facades\Storage;
 
 class OrderController extends Controller
 {
@@ -41,35 +42,11 @@ class OrderController extends Controller
             'drop_address' => $request->drop_address,
             'price' => $trip->price,
             'payment_method' => $request->payment_method, // 🔥 ini inti
-            'status' => 'waiting_departure'
+            'status' => 'completed',
+            // Baik tunai maupun QRIS baru dianggap lunas setelah mitra
+            // konfirmasi pembayaran diterima (lihat OrderController::confirmPayment).
+            'payment_status' => 'unpaid'
         ]);
-
-        // Untuk QRIS/e-wallet, pembayaran sudah lunas di muka saat checkout,
-        // jadi saldo mitra dicairkan sekarang. Ini terpisah dari status
-        // perjalanan (waiting_departure -> ... -> completed), yang hanya
-        // melacak progres fisik trip, bukan status pembayaran.
-        if ($order->payment_method !== 'cash') {
-
-            $mitraId = $trip->mitra_id;
-
-            // ambil / buat saldo
-            $balance = DriverBalance::firstOrCreate(
-                ['user_id' => $mitraId],
-                ['balance' => 0]
-            );
-
-            // tambah saldo
-            $balance->increment('balance', $order->price);
-
-            // catat transaksi
-            BalanceTransaction::create([
-                'user_id' => $mitraId,
-                'order_id' => $order->id,
-                'type' => 'credit',
-                'amount' => $order->price,
-                'description' => 'Pendapatan dari order #' . $order->id
-            ]);
-        }
 
         $order->load('trip', 'customer');
 
@@ -131,7 +108,7 @@ class OrderController extends Controller
         $order = Order::with([
             'trip.originPoint.city',
             'trip.destinationPoint.city',
-            'trip.mitra',
+            'trip.mitra.profile',
             'customer'
         ])->findOrFail($id);
 
@@ -161,24 +138,93 @@ class OrderController extends Controller
         return response()->json($orders);
     }
 
-    // Endpoint gabungan khusus dashboard: reward points + 5 aktivitas
-    // terbaru saja, jadi 1 request bukan 2, dan payload lebih ringan
-    // dari halaman Riwayat penuh.
-    public function dashboardSummary(Request $request)
+    // ================= CUSTOMER: UPLOAD BUKTI PEMBAYARAN QRIS =================
+    public function uploadPaymentProof(Request $request, $id)
     {
-        $user = $request->user();
+        $request->validate([
+            'payment_proof' => 'required|image|max:4096',
+        ]);
 
-        $recentOrders = Order::with([
-            'trip:id,vehicle_type,departure_date,departure_time,origin_point_id,destination_point_id',
-        ])
-        ->where('customer_id', $user->id)
-        ->latest()
-        ->limit(5)
-        ->get();
+        $order = Order::findOrFail($id);
+
+        if ($order->customer_id !== auth()->id()) {
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+
+        if ($order->payment_method === 'cash') {
+            return response()->json([
+                'message' => 'Order ini menggunakan pembayaran tunai, tidak perlu bukti pembayaran.'
+            ], 400);
+        }
+
+        // Hapus bukti lama kalau ada (jika upload ulang)
+        if ($order->payment_proof) {
+            Storage::disk('public')->delete($order->payment_proof);
+        }
+
+        $path = $request->file('payment_proof')->store('payment_proofs', 'public');
+
+        $order->update([
+            'payment_proof' => $path,
+            'payment_status' => 'waiting_confirmation',
+        ]);
 
         return response()->json([
-            'reward_points' => $user->reward_points,
-            'recent_activities' => $recentOrders,
+            'message' => 'Bukti pembayaran berhasil dikirim. Menunggu konfirmasi mitra.',
+            'order' => $order,
+        ]);
+    }
+
+    // ================= MITRA: KONFIRMASI PEMBAYARAN SUDAH DITERIMA =================
+    public function confirmPayment($id)
+    {
+        $order = Order::with('trip')->findOrFail($id);
+
+        if (!$order->trip || $order->trip->mitra_id !== auth()->id()) {
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+
+        if ($order->payment_status === 'paid') {
+            return response()->json([
+                'message' => 'Pembayaran order ini sudah dikonfirmasi sebelumnya.'
+            ], 400);
+        }
+
+        // Bukti pembayaran hanya wajib untuk metode non-tunai (QRIS dkk).
+        // Tunai cukup konfirmasi lisan/manual dari mitra, tanpa foto.
+        if ($order->payment_method !== 'cash' && !$order->payment_proof) {
+            return response()->json([
+                'message' => 'Customer belum mengupload bukti pembayaran.'
+            ], 400);
+        }
+
+        $order->update(['payment_status' => 'paid']);
+
+        // Kredit saldo mitra sekarang, setelah pembayaran benar-benar dikonfirmasi
+        $mitraId = $order->trip->mitra_id;
+
+        $balance = DriverBalance::firstOrCreate(
+            ['user_id' => $mitraId],
+            ['balance' => 0]
+        );
+
+        $balance->increment('balance', $order->price);
+
+        BalanceTransaction::create([
+            'user_id' => $mitraId,
+            'order_id' => $order->id,
+            'type' => 'credit',
+            'amount' => $order->price,
+            'description' => 'Pendapatan dari order #' . $order->id . ' (QRIS terkonfirmasi)'
+        ]);
+
+        return response()->json([
+            'message' => 'Pembayaran berhasil dikonfirmasi.',
+            'order' => $order,
         ]);
     }
 }

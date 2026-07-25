@@ -19,6 +19,8 @@ class Order extends Model
         'status',
         'item_order_id',
         'payment_method',
+        'payment_proof',
+        'payment_status',
         'readiness_status',
     ];
 
