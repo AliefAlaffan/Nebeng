@@ -1,56 +1,119 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import { ChevronLeft, ChevronRight, ChevronDown, ShieldCheck, Mail, Phone, MapPin, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "../../context/UserContext";
 
 export default function StatusAkun() {
 	const navigate = useNavigate();
+	const { user, loadingUser } = useUser();
 	const [openDropdown, setOpenDropdown] = useState(null);
 
-	// Data Profile berdasarkan image_8d3b0a.png
+	const [verification, setVerification] = useState(null);
+	const [loadingVerification, setLoadingVerification] = useState(true);
+
+	// Ambil status verifikasi (dokumen pendaftaran mitra) yang sebenarnya,
+	// bukan data dummy.
+	useEffect(() => {
+		const fetchVerification = async () => {
+			try {
+				const token = localStorage.getItem("token");
+
+				const res = await fetch("http://127.0.0.1:8000/api/verification/status", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+					},
+				});
+
+				if (res.ok) {
+					const data = await res.json();
+					setVerification(data);
+				}
+			} catch (err) {
+				console.error("Gagal ambil status verifikasi:", err);
+			} finally {
+				setLoadingVerification(false);
+			}
+		};
+
+		fetchVerification();
+	}, []);
+
+	// Data profil diambil dari akun mitra yang sedang login (bukan dummy)
 	const profileData = {
-		name: "Kamado Tanjiro",
-		id: "213461",
-		joinDate: "19 Januari 2024",
-		phone: "(+62) 81349182987",
-		email: "kamado.tanjiro@gmail.com",
-		location: "Yogyakarta",
-		avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Tanjiro",
+		name: user?.name || "-",
+		id: user?.id ?? "-",
+		joinDate: user?.created_at
+			? new Date(user.created_at).toLocaleDateString("id-ID", {
+					day: "2-digit",
+					month: "long",
+					year: "numeric",
+			  })
+			: "-",
+		phone: user?.phone || "-",
+		email: user?.email || "-",
+		location: user?.profile?.address || "Belum diisi",
+		avatar: user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "Mitra"}`,
 	};
 
-	// Data Status berdasarkan image_8d3b0a.png & image_8d8d79.png
+	// Label & warna status verifikasi pendaftaran, berdasarkan status asli
+	const verificationStatusLabelMap = {
+		pending: "Sedang diproses",
+		verified: "Disetujui",
+		rejected: "Ditolak",
+	};
+
+	const registrationStatusLabel = verification ? verificationStatusLabelMap[verification.status] || verification.status : user?.status === "verified" ? "Disetujui" : "Belum ada pengajuan";
+
+	const registrationDesc = verification
+		? verification.status === "pending"
+			? "Dokumen Anda sudah terkirim dan sedang dalam proses verifikasi"
+			: verification.status === "verified"
+			? "Dokumen Anda telah berhasil diverifikasi oleh admin"
+			: verification.notes || "Pengajuan verifikasi Anda ditolak, silakan ajukan ulang"
+		: "Anda belum pernah mengajukan verifikasi dokumen mitra";
+
+	// Status aktivitas akun: bagian "Status pendaftaran" sudah pakai data
+	// verifikasi asli. Bagian lain (tambah/hapus kendaraan, perubahan
+	// dokumen) belum ada pencatatan tersendiri di backend, jadi ditampilkan
+	// apa adanya sebagai "belum ada aktivitas" alih-alih data dummy.
 	const accountStatuses = [
 		{
 			id: "pendaftaran",
 			label: "Status pendaftaran",
 			title: "Status Dokumen Pendaftaran Mitra Nebeng",
-			desc: "Dokumen Anda sudah terkirim dan sedang dalam proses verifikasi",
-			statusLabel: "Sedang diproses",
+			desc: registrationDesc,
+			statusLabel: registrationStatusLabel,
 			item: "Dokumen driver",
+			hasData: !!verification,
 		},
 		{
 			id: "tambah_kendaraan",
 			label: "Status tambah kendaraan",
 			title: "Verifikasi Kendaraan Baru",
-			desc: "Admin sedang meninjau kelengkapan STNK dan foto kendaraan Anda",
-			statusLabel: "Menunggu",
-			item: "Data Kendaraan",
+			desc: "Belum ada pengajuan tambah kendaraan.",
+			statusLabel: null,
+			item: null,
+			hasData: false,
 		},
 		{
 			id: "hapus_kendaraan",
 			label: "Status hapus kendaraan",
 			title: "Pengajuan Hapus Kendaraan",
-			desc: "Permintaan penghapusan unit kendaraan telah disetujui",
-			statusLabel: "Disetujui",
-			item: "Unit Avanza R 2424 MJ",
+			desc: "Belum ada pengajuan hapus kendaraan.",
+			statusLabel: null,
+			item: null,
+			hasData: false,
 		},
 		{
 			id: "perubahan_dokumen",
 			label: "Status perubahan dokumen",
 			title: "Pembaruan Dokumen Identitas",
-			desc: "Perubahan KTP/SIM Anda telah berhasil diverifikasi oleh sistem",
-			statusLabel: "Selesai",
-			item: "Dokumen SIM A",
+			desc: "Belum ada pengajuan perubahan dokumen.",
+			statusLabel: null,
+			item: null,
+			hasData: false,
 		},
 	];
 
@@ -72,28 +135,32 @@ export default function StatusAkun() {
 				<div className="space-y-6">
 					{/* PROFILE CARD */}
 					<div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
-						<div className="flex flex-col items-center md:items-start md:flex-row gap-6 mb-6">
-							<div className="w-24 h-24 rounded-3xl overflow-hidden border-4 border-gray-50 shadow-sm shrink-0">
-								<img src={profileData.avatar} alt="Profile" className="w-full h-full object-cover bg-indigo-50" />
-							</div>
-							<div className="text-center md:text-left space-y-1">
-								<h2 className="text-xl font-black text-gray-800">{profileData.name}</h2>
-								<p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-									{profileData.id} | Bergabung sejak {profileData.joinDate}
-								</p>
-								<div className="pt-3 space-y-2">
-									<div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-500 font-medium italic">
-										<Phone size={14} className="text-indigo-400" /> {profileData.phone}
-									</div>
-									<div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-500 font-medium italic border-t border-gray-50 pt-2">
-										<Mail size={14} className="text-indigo-400" /> {profileData.email}
-									</div>
-									<div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-500 font-medium italic border-t border-gray-50 pt-2">
-										<MapPin size={14} className="text-indigo-400" /> {profileData.location}
+						{loadingUser ? (
+							<div className="py-6 text-center text-sm font-bold text-gray-400">Memuat data akun...</div>
+						) : (
+							<div className="flex flex-col items-center md:items-start md:flex-row gap-6 mb-6">
+								<div className="w-24 h-24 rounded-3xl overflow-hidden border-4 border-gray-50 shadow-sm shrink-0">
+									<img src={profileData.avatar} alt="Profile" className="w-full h-full object-cover bg-indigo-50" />
+								</div>
+								<div className="text-center md:text-left space-y-1">
+									<h2 className="text-xl font-black text-gray-800">{profileData.name}</h2>
+									<p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+										ID-{profileData.id} | Bergabung sejak {profileData.joinDate}
+									</p>
+									<div className="pt-3 space-y-2">
+										<div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-500 font-medium italic">
+											<Phone size={14} className="text-indigo-400" /> {profileData.phone}
+										</div>
+										<div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-500 font-medium italic border-t border-gray-50 pt-2">
+											<Mail size={14} className="text-indigo-400" /> {profileData.email}
+										</div>
+										<div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-500 font-medium italic border-t border-gray-50 pt-2">
+											<MapPin size={14} className="text-indigo-400" /> {profileData.location}
+										</div>
 									</div>
 								</div>
 							</div>
-						</div>
+						)}
 					</div>
 
 					{/* STATUS LIST WITH DROPDOWN */}
@@ -116,21 +183,23 @@ export default function StatusAkun() {
 								{openDropdown === status.id && (
 									<div className="mt-2 p-6 bg-white rounded-2xl border-2 border-indigo-50 shadow-inner animate-in slide-in-from-top-2 duration-300">
 										<h4 className="text-lg font-black text-indigo-900 mb-2 leading-tight">{status.title}</h4>
-										<p className="text-xs text-gray-400 font-medium leading-relaxed mb-6">{status.desc}</p>
+										<p className="text-xs text-gray-400 font-medium leading-relaxed mb-6">{status.id === "pendaftaran" && loadingVerification ? "Memuat status..." : status.desc}</p>
 
-										<div className="flex items-center justify-between p-4 rounded-xl border border-indigo-100 bg-indigo-50/30">
-											<div className="flex items-center gap-3">
-												<div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
-													<FileText size={16} />
+										{status.hasData && (
+											<div className="flex items-center justify-between p-4 rounded-xl border border-indigo-100 bg-indigo-50/30">
+												<div className="flex items-center gap-3">
+													<div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
+														<FileText size={16} />
+													</div>
+													<span className="text-sm font-black text-gray-700">{status.item}</span>
 												</div>
-												<span className="text-sm font-black text-gray-700">{status.item}</span>
+												<span
+													className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${status.statusLabel === "Disetujui" ? "bg-emerald-100 text-emerald-600" : status.statusLabel === "Ditolak" ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600"}`}
+												>
+													{status.statusLabel}
+												</span>
 											</div>
-											<span
-												className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${status.statusLabel === "Disetujui" || status.statusLabel === "Selesai" ? "bg-emerald-100 text-emerald-600" : "bg-orange-100 text-orange-600"}`}
-											>
-												{status.statusLabel}
-											</span>
-										</div>
+										)}
 									</div>
 								)}
 							</div>
