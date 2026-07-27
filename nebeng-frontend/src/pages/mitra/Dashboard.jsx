@@ -51,24 +51,58 @@ export default function Dashboard() {
 	// /api/mitra/trips menarik SELURUH riwayat trip padahal cuma
 	// butuh 2 yang terdekat)
 	useEffect(() => {
+		const token = localStorage.getItem("token");
+
+		// Fallback kalau endpoint gabungan /mitra/dashboard-summary bermasalah
+		// (mis. 404) - supaya saldo tidak diam-diam nyangkut di 0 padahal
+		// sebenarnya ada (endpoint /api/balance ini yang dipakai halaman
+		// Riwayat Saldo dan sudah terbukti jalan).
+		const fetchSummaryFallback = async () => {
+			try {
+				const res = await fetch("http://127.0.0.1:8000/api/balance", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+					},
+				});
+
+				if (res.ok) {
+					const data = await res.json();
+					setBalance(data.balance || 0);
+				}
+			} catch (err) {
+				console.error("Fallback saldo gagal:", err);
+			} finally {
+				setLoadingBalance(false);
+				setLoadingTrips(false);
+			}
+		};
+
 		const fetchSummary = async () => {
 			try {
 				const res = await fetch("http://127.0.0.1:8000/api/mitra/dashboard-summary", {
 					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
+						Authorization: `Bearer ${token}`,
 						Accept: "application/json",
 					},
 				});
+
+				if (!res.ok) {
+					// endpoint gabungan gagal -> jangan diam-diam tampilkan 0,
+					// coba ambil saldo lewat endpoint terpisah yang sudah pasti jalan.
+					await fetchSummaryFallback();
+					return;
+				}
 
 				const data = await res.json();
 
 				setBalance(data.balance || 0);
 				setUpcomingTrips(data.upcoming_trips || []);
-			} catch (err) {
-				console.error("Gagal ambil ringkasan dashboard:", err);
-			} finally {
 				setLoadingBalance(false);
 				setLoadingTrips(false);
+			} catch (err) {
+				console.error("Gagal ambil ringkasan dashboard:", err);
+				await fetchSummaryFallback();
 			}
 		};
 

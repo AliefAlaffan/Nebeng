@@ -81,6 +81,15 @@ export default function RiwayatSaldo() {
 		fetchBalance();
 	}, []);
 
+	// Sebelumnya teks bulan di card "Saldo Tersisa" statis ("Oktober 2024").
+	// Sekarang otomatis ikut bulan & tahun saat ini.
+	const currentMonthLabel = new Date()
+		.toLocaleDateString("id-ID", {
+			month: "long",
+			year: "numeric",
+		})
+		.toUpperCase();
+
 	return (
 		<MitraLayout>
 			<div className="w-full max-w-screen-xl mx-auto px-4 py-6 space-y-6">
@@ -109,7 +118,7 @@ export default function RiwayatSaldo() {
 								<h2 className="text-3xl font-black tracking-tighter mb-6">Rp {saldo.toLocaleString("id-ID")}</h2>
 								<div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider bg-white/10 w-fit px-3 py-1.5 rounded-full border border-white/10">
 									<CalendarIcon size={12} className="text-indigo-300" />
-									Oktober 2024
+									{currentMonthLabel}
 								</div>
 							</div>
 							<Wallet size={140} className="absolute -right-8 -bottom-8 text-white opacity-5 transform -rotate-12 group-hover:scale-110 transition-transform duration-700" />
