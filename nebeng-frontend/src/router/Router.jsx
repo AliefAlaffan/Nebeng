@@ -17,6 +17,7 @@ import KendaraanMitra from "../pages/admin/KendaraanMitra";
 import Setting from "../pages/admin/Setting";
 import VerifikasiCustomer from "../pages/admin/VerifikasiCustomer";
 import VerifikasiMitra from "../pages/admin/VerifikasiMitra";
+import NotifikasiAdmin from "../pages/admin/Notifikasi";
 import DetailMitraAdmin from "../pages/admin/DetailMitra";
 import DetailCustomerAdmin from "../pages/admin/DetailCustomer";
 import DetailOrderAdmin from "../pages/admin/DetailOrder";
@@ -66,6 +67,8 @@ import MitraProfile from "../pages/mitra/Profile";
 import QrisSaya from "../pages/mitra/QrisSaya";
 import MitraRiwayat from "../pages/mitra/Riwayat";
 import StatusAkun from "../pages/mitra/StatusAkun";
+import KeamananMitra from "../pages/mitra/Keamanan";
+import PusatBantuanMitra from "../pages/mitra/PusatBantuan";
 import Dokumen from "../pages/mitra/Dokumen";
 import EditProfileMitra from "../pages/mitra/EditProfile";
 import KonfirmasiTebengan from "../pages/mitra/KonfirmasiTebengan";
@@ -268,6 +271,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="admin">
 						<VerifikasiMitra />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/admin/notifikasi"
+				element={
+					<ProtectedRoute role="admin">
+						<NotifikasiAdmin />
 					</ProtectedRoute>
 				}
 			/>
@@ -723,6 +735,24 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="mitra">
 						<StatusAkun />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/mitra/keamanan"
+				element={
+					<ProtectedRoute role="mitra">
+						<KeamananMitra />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/mitra/pusat-bantuan"
+				element={
+					<ProtectedRoute role="mitra">
+						<PusatBantuanMitra />
 					</ProtectedRoute>
 				}
 			/>
