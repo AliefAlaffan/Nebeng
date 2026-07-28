@@ -26,6 +26,8 @@ use App\Http\Controllers\Api\TripJourneyController;
 use App\Http\Controllers\Api\TripReviewController;
 use App\Http\Controllers\Api\CustomerOrderQrController;
 use App\Http\Controllers\Api\AdminPricingController;
+use App\Http\Controllers\Api\AdminPickupPointController;
+use App\Http\Controllers\Api\MitraVehicleController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -42,7 +44,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'me']);
     Route::post('/profile/update',[ProfileController::class,'update']);
-    Route::post('/profile/qris', [ProfileController::class, 'uploadQris']);
     Route::get('/check-pin', [PinController::class, 'checkPin']);
     Route::post('/update-pin', [PinController::class, 'updatePin']);
     Route::post('/update-password', [PasswordController::class, 'updatePassword']);
@@ -55,6 +56,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/admin/pricing',[AdminPricingController::class, 'index']);
 
     Route::put('/admin/pricing',[AdminPricingController::class, 'update']);
+
+    Route::get('/admin/pickup-points', [AdminPickupPointController::class, 'index']);
+    Route::get('/admin/cities', [AdminPickupPointController::class, 'cities']);
+    Route::post('/admin/pickup-points', [AdminPickupPointController::class, 'store']);
+    Route::put('/admin/pickup-points/{id}', [AdminPickupPointController::class, 'update']);
+    Route::delete('/admin/pickup-points/{id}', [AdminPickupPointController::class, 'destroy']);
 
 });
 
@@ -168,6 +175,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // history HARUS di atas
         Route::get('/orders/history', [OrderController::class, 'history']);
 
+        // endpoint gabungan khusus dashboard (reward-points + 5 aktivitas terakhir)
+        Route::get('/dashboard-summary', [OrderController::class, 'dashboardSummary']);
+
         // detail order di bawah
         Route::get('/orders/{id}', [OrderController::class, 'show']);
 
@@ -183,6 +193,20 @@ Route::middleware('auth:sanctum')->group(function () {
     // USER PROFILE
     Route::get('/admin/users/{id}/profile', [UserProfileController::class, 'show']);
     Route::post('/admin/users/{id}/profile', [UserProfileController::class, 'storeOrUpdate']);
+
+    // KENDARAAN MITRA (admin)
+    Route::get('/admin/kendaraan-mitra', [MitraVehicleController::class, 'adminIndex']);
+    Route::get('/admin/kendaraan-mitra/{id}', [MitraVehicleController::class, 'adminShow']);
+    Route::put('/admin/kendaraan-mitra/{id}', [MitraVehicleController::class, 'adminUpdate']);
+});
+
+// KENDARAAN MITRA (mitra sendiri)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/mitra/vehicles', [MitraVehicleController::class, 'store']);
+    Route::get('/mitra/vehicles', [MitraVehicleController::class, 'myVehicles']);
+    Route::get('/mitra/vehicles/car-capacity', [MitraVehicleController::class, 'myCarCapacity']);
+    Route::put('/mitra/vehicles/{id}', [MitraVehicleController::class, 'update']);
+    Route::delete('/mitra/vehicles/{id}', [MitraVehicleController::class, 'destroy']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -210,7 +234,8 @@ Route::middleware(['auth:sanctum','role:mitra'])->group(function () {
 
     Route::get('/mitra/trips', [TripController::class, 'myTrips']);
 
-    Route::post('/orders/{id}/confirm-payment', [OrderController::class, 'confirmPayment']);
+
+    Route::get('/mitra/dashboard-summary', [TripController::class, 'dashboardSummary']);
 
 });
 
@@ -227,8 +252,6 @@ Route::middleware(['auth:sanctum','role:customer' ])->group(function () {
     });
 
     Route::post('/orders', [OrderController::class, 'store']);
-
-    Route::post('/orders/{id}/upload-payment-proof', [OrderController::class, 'uploadPaymentProof']);
 
     Route::post('/item-orders', [ItemOrderController::class,'store']);
 

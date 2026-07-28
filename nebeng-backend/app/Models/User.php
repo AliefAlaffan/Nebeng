@@ -91,4 +91,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Trip::class, 'mitra_id');
     }
+
+    public function mitraVehicles()
+    {
+        return $this->hasMany(\App\Models\MitraVehicle::class);
+    }
 }

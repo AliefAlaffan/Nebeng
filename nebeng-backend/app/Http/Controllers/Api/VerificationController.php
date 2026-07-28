@@ -50,6 +50,10 @@ class VerificationController extends Controller
             'gender' => 'required|string|max:255',
             'religion' => 'required|string|max:255',
             'address' => 'required|string',
+            'province' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'district' => 'nullable|string|max:255',
+            'village' => 'nullable|string|max:255',
 
         ]);
 
@@ -109,6 +113,10 @@ class VerificationController extends Controller
                 'gender' => $request->gender,
                 'religion' => $request->religion,
                 'address' => $request->address,
+                'province' => $request->province,
+                'city' => $request->city,
+                'district' => $request->district,
+                'village' => $request->village,
 
                 // BANK
                 'bank_name' => $request->bank_name,
