@@ -19,6 +19,41 @@ export default function TambahNebeng() {
 	const [showTypeModal, setShowTypeModal] = useState(false);
 	const [showBaggageModal, setShowBaggageModal] = useState(false);
 
+	// Kapasitas maksimal penumpang sesuai kendaraan mobil yang terdaftar
+	// saat verifikasi mitra (bukan lagi bebas diisi manual).
+	const [carCapacity, setCarCapacity] = useState(null); // null = belum dicek / belum ada kendaraan terdaftar
+	const [loadingCapacity, setLoadingCapacity] = useState(true);
+
+	useEffect(() => {
+		const fetchCarCapacity = async () => {
+			try {
+				const token = localStorage.getItem("token");
+
+				const res = await fetch("http://127.0.0.1:8000/api/mitra/vehicles/car-capacity", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+					},
+				});
+
+				if (res.ok) {
+					const data = await res.json();
+
+					if (data.has_vehicle && data.seat_capacity) {
+						setCarCapacity(data.seat_capacity);
+						setSeatCount(String(data.seat_capacity));
+					}
+				}
+			} catch (err) {
+				console.error("Gagal ambil kapasitas mobil:", err);
+			} finally {
+				setLoadingCapacity(false);
+			}
+		};
+
+		fetchCarCapacity();
+	}, []);
+
 	const typeOptions = [
 		{ id: "penumpang", label: "Hanya Tebengan", desc: "Anda hanya menerima penumpang", icon: Users },
 		{ id: "keduanya", label: "Barang dan Tebengan", desc: "Menerima penumpang dan paket", icon: Briefcase },
@@ -56,6 +91,11 @@ export default function TambahNebeng() {
 	const handleNext = () => {
 		if (!selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount) {
 			alert("Mohon lengkapi semua data perjalanan");
+			return;
+		}
+
+		if (carCapacity && parseInt(seatCount) > carCapacity) {
+			alert(`Jumlah kursi tidak boleh melebihi kapasitas kendaraan terdaftar (maks. ${carCapacity} penumpang).`);
 			return;
 		}
 
@@ -208,7 +248,29 @@ export default function TambahNebeng() {
 								<div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Users size={24} /></div>
 								<div className="flex-1">
 									<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">JUMLAH KURSI TERSEDIA</p>
-									<input type="number" placeholder="Contoh: 1" value={seatCount} onChange={(e) => setSeatCount(e.target.value)} className="bg-transparent font-black text-indigo-900 outline-none w-full text-lg" />
+									<input
+										type="number"
+										placeholder="Contoh: 1"
+										min={1}
+										max={carCapacity || undefined}
+										value={seatCount}
+										onChange={(e) => {
+											const val = e.target.value;
+											if (carCapacity && Number(val) > carCapacity) {
+												setSeatCount(String(carCapacity));
+												return;
+											}
+											setSeatCount(val);
+										}}
+										className="bg-transparent font-black text-indigo-900 outline-none w-full text-lg"
+									/>
+									{loadingCapacity ? (
+										<p className="text-[10px] text-gray-400 mt-1">Memuat kapasitas kendaraan...</p>
+									) : carCapacity ? (
+										<p className="text-[10px] text-indigo-500 font-bold mt-1">Maks. {carCapacity} penumpang sesuai kendaraan terdaftar</p>
+									) : (
+										<p className="text-[10px] text-amber-500 font-bold mt-1">Kamu belum mendaftarkan kendaraan mobil. Lengkapi di halaman Status Akun.</p>
+									)}
 								</div>
 							</div>
 

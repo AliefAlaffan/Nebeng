@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
-import { ChevronLeft, ChevronRight, ChevronDown, ShieldCheck, Mail, Phone, MapPin, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ShieldCheck, Mail, Phone, MapPin, FileText, Bike, Car, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 
@@ -39,6 +39,39 @@ export default function StatusAkun() {
 
 		fetchVerification();
 	}, []);
+
+	const [vehicles, setVehicles] = useState([]);
+	const [loadingVehicles, setLoadingVehicles] = useState(true);
+
+	// Ambil kendaraan yang sudah didaftarkan mitra (bukan dummy)
+	useEffect(() => {
+		const fetchVehicles = async () => {
+			try {
+				const token = localStorage.getItem("token");
+
+				const res = await fetch("http://127.0.0.1:8000/api/mitra/vehicles", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+					},
+				});
+
+				if (res.ok) {
+					const data = await res.json();
+					setVehicles(data);
+				}
+			} catch (err) {
+				console.error("Gagal ambil data kendaraan:", err);
+			} finally {
+				setLoadingVehicles(false);
+			}
+		};
+
+		fetchVehicles();
+	}, []);
+
+	const vehicleTypeIcon = { motor: Bike, mobil: Car, barang: Package };
+	const vehicleTypeLabel = { motor: "Motor", mobil: "Mobil", barang: "Barang" };
 
 	// Data profil diambil dari akun mitra yang sedang login (bukan dummy)
 	const profileData = {
@@ -91,8 +124,8 @@ export default function StatusAkun() {
 		{
 			id: "tambah_kendaraan",
 			label: "Status tambah kendaraan",
-			title: "Verifikasi Kendaraan Baru",
-			desc: "Belum ada pengajuan tambah kendaraan.",
+			title: "Kendaraan Terdaftar",
+			desc: vehicles.length > 0 ? `Kamu memiliki ${vehicles.length} kendaraan terdaftar sebagai mitra.` : "Belum ada kendaraan yang didaftarkan.",
 			statusLabel: null,
 			item: null,
 			hasData: false,
@@ -163,7 +196,41 @@ export default function StatusAkun() {
 						)}
 					</div>
 
-					{/* STATUS LIST WITH DROPDOWN */}
+					{/* KENDARAAN TERDAFTAR */}
+					<div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
+						<h3 className="text-sm font-black text-gray-800 mb-5">Kendaraan Terdaftar</h3>
+
+						{loadingVehicles ? (
+							<p className="text-sm font-bold text-gray-400 text-center py-4">Memuat data kendaraan...</p>
+						) : vehicles.length > 0 ? (
+							<div className="space-y-3">
+								{vehicles.map((v) => {
+									const Icon = vehicleTypeIcon[v.type] || Car;
+									return (
+										<div key={v.id} className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-2xl p-4">
+											<div className="w-12 h-12 rounded-xl bg-indigo-900 text-white flex items-center justify-center shrink-0">
+												<Icon size={22} />
+											</div>
+											<div className="flex-1 min-w-0">
+												<p className="font-black text-gray-800 text-sm truncate">
+													{vehicleTypeLabel[v.type] || v.type} • {v.brand} {v.model}
+												</p>
+												<p className="text-xs text-gray-400 font-medium truncate">
+													{v.plate_number}
+													{v.color ? ` • ${v.color}` : ""}
+													{v.type === "mobil" && v.seat_capacity ? ` • Maks. ${v.seat_capacity} penumpang` : ""}
+												</p>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						) : (
+							<div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-6 text-center">
+								<p className="text-sm font-bold text-gray-400">Belum ada kendaraan terdaftar</p>
+							</div>
+						)}
+					</div>
 					<div className="space-y-3">
 						<h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-4 pl-2">Detail Aktivitas Akun</h3>
 

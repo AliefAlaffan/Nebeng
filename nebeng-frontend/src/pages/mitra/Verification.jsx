@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import CameraCapture from "../../components/verification/CameraCapture";
-import { ChevronRight, ChevronLeft, UploadCloud, CheckCircle2, Camera, FileText, UserCheck, Trash2, Loader2, CreditCard, ShieldCheck, BadgeCheck } from "lucide-react";
+import { ChevronRight, ChevronLeft, UploadCloud, CheckCircle2, Camera, FileText, UserCheck, Trash2, Loader2, CreditCard, ShieldCheck, BadgeCheck, Car, Plus, Bike, Package } from "lucide-react";
 
 // Konfigurasi kamera untuk masing-masing step foto data diri (biometrik)
 const CAMERA_CONFIG = {
@@ -44,6 +44,56 @@ export default function Verification() {
 	});
 
 	const [loading, setLoading] = useState(false);
+
+	// Data kendaraan yang didaftarkan mitra (bisa lebih dari 1: motor, mobil, barang)
+	const [vehicles, setVehicles] = useState([]);
+	const [vehicleForm, setVehicleForm] = useState({
+		type: "mobil",
+		brand: "",
+		model: "",
+		plate_number: "",
+		color: "",
+		seat_capacity: "",
+	});
+	const [vehicleError, setVehicleError] = useState("");
+
+	const handleVehicleInput = (e) => {
+		setVehicleForm({
+			...vehicleForm,
+			[e.target.name]: e.target.value,
+		});
+	};
+
+	const addVehicle = () => {
+		if (!vehicleForm.brand || !vehicleForm.plate_number) {
+			setVehicleError("Merk dan plat nomor wajib diisi.");
+			return;
+		}
+
+		if (vehicleForm.type === "mobil" && !vehicleForm.seat_capacity) {
+			setVehicleError("Kapasitas maksimal penumpang wajib diisi untuk mobil.");
+			return;
+		}
+
+		setVehicles((prev) => [...prev, { ...vehicleForm }]);
+
+		setVehicleForm({
+			type: "mobil",
+			brand: "",
+			model: "",
+			plate_number: "",
+			color: "",
+			seat_capacity: "",
+		});
+		setVehicleError("");
+	};
+
+	const removeVehicle = (index) => {
+		setVehicles((prev) => prev.filter((_, i) => i !== index));
+	};
+
+	const vehicleTypeIcon = { motor: Bike, mobil: Car, barang: Package };
+	const vehicleTypeLabel = { motor: "Motor", mobil: "Mobil", barang: "Barang" };
 
 	// refs galeri device (dipakai sebagai opsi tambahan selain kamera)
 	const ktpGalleryInputRef = useRef(null);
@@ -107,6 +157,10 @@ export default function Verification() {
 			formData.append("gender", form.gender);
 			formData.append("religion", form.religion);
 			formData.append("address", form.address);
+			formData.append("province", form.province);
+			formData.append("city", form.city);
+			formData.append("district", form.district);
+			formData.append("village", form.village);
 
 			// =========================
 			// BANK
@@ -140,6 +194,23 @@ export default function Verification() {
 				throw new Error(data.message || "Gagal verifikasi");
 			}
 
+			// Kirim data kendaraan satu per satu setelah verifikasi utama berhasil
+			for (const v of vehicles) {
+				try {
+					await fetch("http://127.0.0.1:8000/api/mitra/vehicles", {
+						method: "POST",
+						headers: {
+							Authorization: `Bearer ${token}`,
+							"Content-Type": "application/json",
+							Accept: "application/json",
+						},
+						body: JSON.stringify(v),
+					});
+				} catch (vErr) {
+					console.error("Gagal simpan kendaraan:", vErr);
+				}
+			}
+
 			alert("Verifikasi mitra berhasil dikirim!");
 
 			window.location.href = "/mitra/dashboard";
@@ -160,7 +231,8 @@ export default function Verification() {
 		{ id: 5, title: "Foto SIM", icon: BadgeCheck },
 		{ id: 6, title: "SKCK", icon: ShieldCheck },
 		{ id: 7, title: "Rekening", icon: CreditCard },
-		{ id: 8, title: "Konfirmasi", icon: CheckCircle2 },
+		{ id: 8, title: "Kendaraan", icon: Car },
+		{ id: 9, title: "Konfirmasi", icon: CheckCircle2 },
 	];
 
 	return (
@@ -384,8 +456,91 @@ export default function Verification() {
 						</div>
 					)}
 
-					{/* KONFIRMASI */}
+					{/* DATA KENDARAAN */}
 					{step === 8 && (
+						<div className="animate-in fade-in duration-300">
+							<h3 className="text-2xl font-black text-gray-800 mb-2 text-center">Data Kendaraan</h3>
+
+							<p className="text-sm text-gray-400 text-center mb-8">Daftarkan minimal 1 kendaraan yang akan kamu gunakan sebagai mitra.</p>
+
+							{/* DAFTAR KENDARAAN YANG SUDAH DITAMBAHKAN */}
+							{vehicles.length > 0 && (
+								<div className="space-y-3 mb-8">
+									{vehicles.map((v, i) => {
+										const Icon = vehicleTypeIcon[v.type];
+										return (
+											<div key={i} className="flex items-center gap-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
+												<div className="w-12 h-12 rounded-xl bg-indigo-900 text-white flex items-center justify-center shrink-0">
+													<Icon size={22} />
+												</div>
+												<div className="flex-1 min-w-0">
+													<p className="font-black text-gray-800 text-sm truncate">
+														{vehicleTypeLabel[v.type]} • {v.brand} {v.model}
+													</p>
+													<p className="text-xs text-gray-400 font-medium truncate">
+														{v.plate_number} {v.color ? `• ${v.color}` : ""} {v.type === "mobil" ? `• Maks. ${v.seat_capacity} penumpang` : ""}
+													</p>
+												</div>
+												<button onClick={() => removeVehicle(i)} className="p-2 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-all shrink-0">
+													<Trash2 size={16} />
+												</button>
+											</div>
+										);
+									})}
+								</div>
+							)}
+
+							{/* FORM TAMBAH KENDARAAN */}
+							<div className="bg-gray-50 rounded-3xl p-6 border border-gray-100 space-y-4">
+								<SelectField
+									label="Jenis Kendaraan"
+									name="type"
+									value={vehicleForm.type}
+									onChange={handleVehicleInput}
+									options={["motor", "mobil", "barang"]}
+								/>
+
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<InputField label="Merk (contoh: Toyota, Honda)" name="brand" value={vehicleForm.brand} onChange={handleVehicleInput} />
+									<InputField label="Model / Tipe" name="model" value={vehicleForm.model} onChange={handleVehicleInput} />
+									<InputField label="Plat Nomor" name="plate_number" value={vehicleForm.plate_number} onChange={handleVehicleInput} />
+									<InputField label="Warna" name="color" value={vehicleForm.color} onChange={handleVehicleInput} />
+
+									{vehicleForm.type === "mobil" && (
+										<div className="md:col-span-2">
+											<InputField label="Kapasitas Maksimal Penumpang" name="seat_capacity" type="number" min={1} value={vehicleForm.seat_capacity} onChange={handleVehicleInput} />
+											<p className="text-[11px] text-gray-400 mt-1.5 px-1">
+												Murni jumlah <span className="font-bold">penumpang</span> (tidak termasuk kamu sebagai supir). Angka ini akan jadi batas jumlah penumpang saat kamu membuat tebengan mobil nanti — persis sama seperti yang kamu isi di sini.
+											</p>
+										</div>
+									)}
+								</div>
+
+								{vehicleError && <p className="text-xs font-bold text-red-500">{vehicleError}</p>}
+
+								<button type="button" onClick={addVehicle} className="w-full py-3.5 rounded-2xl bg-indigo-100 text-indigo-700 font-black text-sm flex items-center justify-center gap-2 hover:bg-indigo-200 transition-all">
+									<Plus size={18} /> Tambah Kendaraan Ini
+								</button>
+							</div>
+
+							<div className="flex items-center gap-4 mt-10">
+								<button onClick={() => setStep(7)} className="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition-all">
+									Kembali
+								</button>
+
+								<button
+									onClick={() => setStep(9)}
+									disabled={vehicles.length === 0}
+									className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+								>
+									Lanjut <ChevronRight size={20} />
+								</button>
+							</div>
+						</div>
+					)}
+
+					{/* KONFIRMASI */}
+					{step === 9 && (
 						<div className="animate-in fade-in zoom-in duration-300">
 							<h3 className="text-xl font-bold text-gray-800 text-center mb-6">Periksa Kembali Dokumen Anda</h3>
 
@@ -403,8 +558,24 @@ export default function Verification() {
 								<ReviewCard label="Rekening" img={preview(files.bank)} />
 							</div>
 
+							{vehicles.length > 0 && (
+								<div className="mb-8">
+									<p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Kendaraan Terdaftar</p>
+									<div className="space-y-2">
+										{vehicles.map((v, i) => (
+											<div key={i} className="flex items-center justify-between bg-gray-50 rounded-2xl p-4 border border-gray-100">
+												<span className="text-sm font-black text-gray-700">
+													{vehicleTypeLabel[v.type]} • {v.brand} {v.model} • {v.plate_number}
+												</span>
+												{v.type === "mobil" && <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase">Maks. {v.seat_capacity} Kursi</span>}
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+
 							<div className="flex items-center gap-4">
-								<button onClick={() => setStep(7)} className="flex-1 py-4 border-2 border-gray-100 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
+								<button onClick={() => setStep(8)} className="flex-1 py-4 border-2 border-gray-100 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
 									<ChevronLeft size={20} /> Kembali
 								</button>
 
