@@ -9,7 +9,6 @@ use App\Models\VerificationFile;
 use Illuminate\Support\Facades\Storage;
 use App\Models\UserProfile;
 use App\Models\User;
-use App\Models\Vehicle;
 use App\Services\NotificationService;
 
 class VerificationController extends Controller
@@ -52,6 +51,10 @@ class VerificationController extends Controller
             'gender' => 'required|string|max:255',
             'religion' => 'required|string|max:255',
             'address' => 'required|string',
+            'province' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'district' => 'nullable|string|max:255',
+            'village' => 'nullable|string|max:255',
 
         ]);
 
@@ -73,6 +76,12 @@ class VerificationController extends Controller
         // =========================
         // VALIDASI KHUSUS MITRA
         // =========================
+        // Catatan: data kendaraan (motor/mobil/barang) TIDAK divalidasi/disimpan
+        // di sini. Itu dikirim terpisah oleh frontend ke
+        // POST /api/mitra/vehicles (MitraVehicleController) setelah verifikasi
+        // utama ini berhasil, dan tersimpan ke tabel `mitra_vehicles`
+        // (bukan tabel `vehicles` lama yang terhubung ke `drivers` dan
+        // tidak punya kolom user_id/vehicle_type/color sama sekali).
         if ($request->type === 'mitra') {
 
             $request->validate([
@@ -86,14 +95,6 @@ class VerificationController extends Controller
                 'bank_name' => 'required|string|max:255',
                 'bank_account_name' => 'required|string|max:255',
                 'bank_account_number' => 'required|string|max:255',
-
-                // DATA KENDARAAN
-                'vehicle_type' => 'required|string|in:motor,mobil',
-                'vehicle_brand' => 'required|string|max:255',
-                'vehicle_model' => 'required|string|max:255',
-                'vehicle_plate' => 'required|string|max:255',
-                'vehicle_color' => 'required|string|max:255',
-                'vehicle_seat_capacity' => 'required|integer|min:1|max:20',
             ]);
         }
 
@@ -119,6 +120,10 @@ class VerificationController extends Controller
                 'gender' => $request->gender,
                 'religion' => $request->religion,
                 'address' => $request->address,
+                'province' => $request->province,
+                'city' => $request->city,
+                'district' => $request->district,
+                'village' => $request->village,
 
                 // BANK
                 'bank_name' => $request->bank_name,
@@ -126,24 +131,6 @@ class VerificationController extends Controller
                 'bank_account_number' => $request->bank_account_number,
             ]
         );
-
-        // =========================
-        // SIMPAN DATA KENDARAAN (khusus mitra)
-        // =========================
-        if ($request->type === 'mitra') {
-            Vehicle::updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'vehicle_type' => $request->vehicle_type,
-                    'brand' => $request->vehicle_brand,
-                    'model' => $request->vehicle_model,
-                    'plate_number' => $request->vehicle_plate,
-                    'color' => $request->vehicle_color,
-                    // Motor cuma bisa angkut 1 penumpang, berapa pun yang diinput
-                    'seat_capacity' => $request->vehicle_type === 'motor' ? 1 : $request->vehicle_seat_capacity,
-                ]
-            );
-        }
 
         // =========================
         // CREATE VERIFICATION
@@ -191,7 +178,15 @@ class VerificationController extends Controller
             }
         }
 
-        $this->notifyAdmins($user->name, $request->type);
+        // Notifikasi admin bersifat "nice to have" - jangan sampai proses
+        // verifikasi utama (yang sudah berhasil disimpan di atas) ikut gagal
+        // hanya karena ada masalah di sisi notifikasi (mis. migration tabel
+        // `notifications` belum dijalankan).
+        try {
+            $this->notifyAdmins($user->name, $request->type);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal kirim notifikasi verifikasi baru: ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Verifikasi berhasil dikirim',
@@ -228,15 +223,19 @@ class VerificationController extends Controller
                 'status' => 'verified'
             ]);
 
-        NotificationService::send(
-            $verification->user_id,
-            'Verifikasi Disetujui',
-            $verification->type === 'mitra'
-                ? 'Selamat! Akun mitra kamu sudah terverifikasi. Kamu sekarang bisa membuat tebengan.'
-                : 'Selamat! Akun kamu sudah terverifikasi.',
-            'verification',
-            $verification->type === 'mitra' ? '/mitra/dashboard' : '/customer/dashboard'
-        );
+        try {
+            NotificationService::send(
+                $verification->user_id,
+                'Verifikasi Disetujui',
+                $verification->type === 'mitra'
+                    ? 'Selamat! Akun mitra kamu sudah terverifikasi. Kamu sekarang bisa membuat tebengan.'
+                    : 'Selamat! Akun kamu sudah terverifikasi.',
+                'verification',
+                $verification->type === 'mitra' ? '/mitra/dashboard' : '/customer/dashboard'
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal kirim notifikasi persetujuan verifikasi: ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'User berhasil diverifikasi'

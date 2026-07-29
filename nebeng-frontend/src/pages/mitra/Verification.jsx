@@ -184,11 +184,18 @@ export default function Verification() {
 				method: "POST",
 				headers: {
 					Authorization: `Bearer ${token}`,
+					Accept: "application/json",
 				},
 				body: formData,
 			});
 
-			const data = await res.json();
+			let data;
+			try {
+				data = await res.json();
+			} catch {
+				// Server balas HTML (mis. halaman error PHP), bukan JSON.
+				throw new Error(`Server error (status ${res.status}). Cek log Laravel untuk detail penyebabnya.`);
+			}
 
 			if (!res.ok) {
 				throw new Error(data.message || "Gagal verifikasi");
