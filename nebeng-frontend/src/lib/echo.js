@@ -2,7 +2,11 @@ import Echo from "laravel-echo";
 import Pusher from "pusher-js";
 
 window.Pusher = Pusher;
-window.Pusher.logToConsole = true;
+// Log websocket sebelumnya selalu aktif (window.Pusher.logToConsole = true)
+// dan membanjiri console dengan ratusan log setiap detik, yang bikin
+// DevTools & rendering browser terasa berat/lag. Sekarang cuma aktif kalau
+// memang lagi debug websocket (?ws_debug=1 di URL).
+window.Pusher.logToConsole = new URLSearchParams(window.location.search).has("ws_debug");
 
 const echo = new Echo({
 	broadcaster: "reverb",

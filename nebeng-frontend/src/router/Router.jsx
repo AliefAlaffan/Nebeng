@@ -1,101 +1,118 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "../middleware/ProtectedRoute";
 
-import Login from "../pages/Login";
-import Register from "../pages/Register";
+// Semua halaman di-lazy-load (code-splitting per route) supaya initial
+// bundle jauh lebih kecil dan tiap halaman hanya memuat JS miliknya
+// sendiri, bukan seluruh aplikasi (admin+customer+mitra+pos_mitra sekaligus).
+const Login = lazy(() => import("../pages/Login"));
+const Register = lazy(() => import("../pages/Register"));
+
 
 /* ADMIN */
-import Dashboard from "../pages/admin/Dashboard";
-import Pesanan from "../pages/admin/Pesanan";
-import Laporan from "../pages/admin/Laporan";
-import Refund from "../pages/admin/Refund";
-import BlokirCustomer from "../pages/admin/BlokirCustomer";
-import BlokirMitra from "../pages/admin/BlokirMitra";
-import DaftarCustomer from "../pages/admin/DaftarCustomer";
-import DaftarMitra from "../pages/admin/DaftarMitra";
-import KendaraanMitra from "../pages/admin/KendaraanMitra";
-import Setting from "../pages/admin/Setting";
-import VerifikasiCustomer from "../pages/admin/VerifikasiCustomer";
-import VerifikasiMitra from "../pages/admin/VerifikasiMitra";
-import NotifikasiAdmin from "../pages/admin/Notifikasi";
-import DetailMitraAdmin from "../pages/admin/DetailMitra";
-import DetailCustomerAdmin from "../pages/admin/DetailCustomer";
-import DetailOrderAdmin from "../pages/admin/DetailOrder";
-import ProfileAdmin from "../pages/admin/Profile";
-import EditProfileAdmin from "../pages/admin/EditProfile";
-import AturPasswordAdmin from "../pages/customer/AturPassword";
-import AturHarga from "../pages/admin/PricingManagement";
+const Dashboard = lazy(() => import("../pages/admin/Dashboard"));
+const Pesanan = lazy(() => import("../pages/admin/Pesanan"));
+const Laporan = lazy(() => import("../pages/admin/Laporan"));
+const Refund = lazy(() => import("../pages/admin/Refund"));
+const BlokirCustomer = lazy(() => import("../pages/admin/BlokirCustomer"));
+const BlokirMitra = lazy(() => import("../pages/admin/BlokirMitra"));
+const DaftarCustomer = lazy(() => import("../pages/admin/DaftarCustomer"));
+const DaftarMitra = lazy(() => import("../pages/admin/DaftarMitra"));
+const KendaraanMitra = lazy(() => import("../pages/admin/KendaraanMitra"));
+const Setting = lazy(() => import("../pages/admin/Setting"));
+const VerifikasiCustomer = lazy(() => import("../pages/admin/VerifikasiCustomer"));
+const VerifikasiMitra = lazy(() => import("../pages/admin/VerifikasiMitra"));
+const NotifikasiAdmin = lazy(() => import("../pages/admin/Notifikasi"));
+const DetailMitraAdmin = lazy(() => import("../pages/admin/DetailMitra"));
+const DetailCustomerAdmin = lazy(() => import("../pages/admin/DetailCustomer"));
+const DetailOrderAdmin = lazy(() => import("../pages/admin/DetailOrder"));
+const ProfileAdmin = lazy(() => import("../pages/admin/Profile"));
+const EditProfileAdmin = lazy(() => import("../pages/admin/EditProfile"));
+const AturPasswordAdmin = lazy(() => import("../pages/customer/AturPassword"));
+const AturHarga = lazy(() => import("../pages/admin/PricingManagement"));
 
 /* CUSTOMER */
-import DashboardCustomer from "../pages/customer/Dashboard";
-import NebengMotor from "../pages/customer/NebengMotor";
-import NebengMobil from "../pages/customer/NebengMobil";
-import NebengBarang from "../pages/customer/NebengBarang";
-import Riwayat from "../pages/customer/Riwayat";
-import Pesan from "../pages/customer/Pesan";
-import Profile from "../pages/customer/Profile";
-import Notifikasi from "../pages/customer/Notifikasi";
-import OrderMotor from "../pages/customer/OrderMotor";
-import OrderMobil from "../pages/customer/OrderMobil";
-import OrderBarang from "../pages/customer/OrderBarang";
-import DetailOrder from "../pages/customer/DetailOrder";
-import Pembayaran from "../pages/customer/Pembayaran";
-import PembayaranSelesai from "../pages/customer/PembayaranSelesai";
-import RefundCustomer from "../pages/customer/Refund";
-import EditProfile from "../pages/customer/EditProfile";
-import Alamat from "../pages/customer/Alamat";
-import Keamanan from "../pages/customer/Keamanan";
-import PusatBantuan from "../pages/customer/PusatBantuan";
-import UploadBuktiPembayaran from "../pages/customer/UploadBuktiPembayaran";
-import AturPIN from "../pages/customer/AturPIN";
-import AturPassword from "../pages/customer/AturPassword";
-import KonfirmasiPIN from "../pages/customer/KonfirmasiPIN";
-import RewardPoints from "../pages/customer/RewardPoint";
-import RewardHistory from "../pages/customer/RewardHistory";
-import Verification from "../pages/customer/Verification";
-import PerjalananCustomer from "../pages/customer/PerjalananCustomer";
-import DetailPesanan from "../pages/customer/Pesanan";
-import BeriRating from "../pages/customer/BeriRating";
+const DashboardCustomer = lazy(() => import("../pages/customer/Dashboard"));
+const NebengMotor = lazy(() => import("../pages/customer/NebengMotor"));
+const NebengMobil = lazy(() => import("../pages/customer/NebengMobil"));
+const NebengBarang = lazy(() => import("../pages/customer/NebengBarang"));
+const Riwayat = lazy(() => import("../pages/customer/Riwayat"));
+const Pesan = lazy(() => import("../pages/customer/Pesan"));
+const Profile = lazy(() => import("../pages/customer/Profile"));
+const Notifikasi = lazy(() => import("../pages/customer/Notifikasi"));
+const OrderMotor = lazy(() => import("../pages/customer/OrderMotor"));
+const OrderMobil = lazy(() => import("../pages/customer/OrderMobil"));
+const OrderBarang = lazy(() => import("../pages/customer/OrderBarang"));
+const DetailOrder = lazy(() => import("../pages/customer/DetailOrder"));
+const Pembayaran = lazy(() => import("../pages/customer/Pembayaran"));
+const PembayaranSelesai = lazy(() => import("../pages/customer/PembayaranSelesai"));
+const RefundCustomer = lazy(() => import("../pages/customer/Refund"));
+const EditProfile = lazy(() => import("../pages/customer/EditProfile"));
+const Alamat = lazy(() => import("../pages/customer/Alamat"));
+const Keamanan = lazy(() => import("../pages/customer/Keamanan"));
+const PusatBantuan = lazy(() => import("../pages/customer/PusatBantuan"));
+const UploadBuktiPembayaran = lazy(() => import("../pages/customer/UploadBuktiPembayaran"));
+const AturPIN = lazy(() => import("../pages/customer/AturPIN"));
+const AturPassword = lazy(() => import("../pages/customer/AturPassword"));
+const KonfirmasiPIN = lazy(() => import("../pages/customer/KonfirmasiPIN"));
+const RewardPoints = lazy(() => import("../pages/customer/RewardPoint"));
+const RewardHistory = lazy(() => import("../pages/customer/RewardHistory"));
+const Verification = lazy(() => import("../pages/customer/Verification"));
+const PerjalananCustomer = lazy(() => import("../pages/customer/PerjalananCustomer"));
+const DetailPesanan = lazy(() => import("../pages/customer/Pesanan"));
+const BeriRating = lazy(() => import("../pages/customer/BeriRating"));
 
 /* MITRA */
-import DashboardMitra from "../pages/mitra/Dashboard";
-import TambahNebengMotor from "../pages/mitra/NebengMotor";
-import TambahNebengMobil from "../pages/mitra/NebengMobil";
-import TambahNebengBarang from "../pages/mitra/NebengBarang";
-import PesanMitra from "../pages/mitra/Pesan";
-import MitraProfile from "../pages/mitra/Profile";
-import QrisSaya from "../pages/mitra/QrisSaya";
-import MitraRiwayat from "../pages/mitra/Riwayat";
-import StatusAkun from "../pages/mitra/StatusAkun";
-import KeamananMitra from "../pages/mitra/Keamanan";
-import PusatBantuanMitra from "../pages/mitra/PusatBantuan";
-import Dokumen from "../pages/mitra/Dokumen";
-import EditProfileMitra from "../pages/mitra/EditProfile";
-import KonfirmasiTebengan from "../pages/mitra/KonfirmasiTebengan";
-import DetailTebenganMitra from "../pages/mitra/DetailTebengan";
-import RiwayatSaldo from "../pages/mitra/RiwayatSaldo";
-import TarikSaldo from "../pages/mitra/TarikSaldo";
-import AturPINMitra from "../pages/mitra/AturPIN";
-import KonfirmasiPINMitra from "../pages/mitra/KonfirmasiPIN";
-import AturPasswordMitra from "../pages/mitra/AturPassword";
-import NotifikasiMitra from "../pages/mitra/Notifikasi";
-import KonfirmasiWithdrawPIN from "../pages/mitra/KonfirmasiWithdrawPIN";
-import VerificationMitra from "../pages/mitra/Verification";
-import PerjalananMitra from "../pages/mitra/PerjalananMitra";
-import BeriRatingMitra from "../pages/mitra/BeriRatingMitra";
+const DashboardMitra = lazy(() => import("../pages/mitra/Dashboard"));
+const TambahNebengMotor = lazy(() => import("../pages/mitra/NebengMotor"));
+const TambahNebengMobil = lazy(() => import("../pages/mitra/NebengMobil"));
+const TambahNebengBarang = lazy(() => import("../pages/mitra/NebengBarang"));
+const PesanMitra = lazy(() => import("../pages/mitra/Pesan"));
+const MitraProfile = lazy(() => import("../pages/mitra/Profile"));
+const QrisSaya = lazy(() => import("../pages/mitra/QrisSaya"));
+const MitraRiwayat = lazy(() => import("../pages/mitra/Riwayat"));
+const StatusAkun = lazy(() => import("../pages/mitra/StatusAkun"));
+const KeamananMitra = lazy(() => import("../pages/mitra/Keamanan"));
+const PusatBantuanMitra = lazy(() => import("../pages/mitra/PusatBantuan"));
+const Dokumen = lazy(() => import("../pages/mitra/Dokumen"));
+const EditProfileMitra = lazy(() => import("../pages/mitra/EditProfile"));
+const KonfirmasiTebengan = lazy(() => import("../pages/mitra/KonfirmasiTebengan"));
+const DetailTebenganMitra = lazy(() => import("../pages/mitra/DetailTebengan"));
+const RiwayatSaldo = lazy(() => import("../pages/mitra/RiwayatSaldo"));
+const TarikSaldo = lazy(() => import("../pages/mitra/TarikSaldo"));
+const AturPINMitra = lazy(() => import("../pages/mitra/AturPIN"));
+const KonfirmasiPINMitra = lazy(() => import("../pages/mitra/KonfirmasiPIN"));
+const AturPasswordMitra = lazy(() => import("../pages/mitra/AturPassword"));
+const NotifikasiMitra = lazy(() => import("../pages/mitra/Notifikasi"));
+const KonfirmasiWithdrawPIN = lazy(() => import("../pages/mitra/KonfirmasiWithdrawPIN"));
+const VerificationMitra = lazy(() => import("../pages/mitra/Verification"));
+const PerjalananMitra = lazy(() => import("../pages/mitra/PerjalananMitra"));
+const BeriRatingMitra = lazy(() => import("../pages/mitra/BeriRatingMitra"));
 
 // Pos Mitra
-import DashboardPosMitra from "../pages/pos_mitra/Dashboard";
-import Aktivitas from "../pages/pos_mitra/Aktivitas";
-import DetailAktivitas from "../pages/pos_mitra/DetailAktivitas";
-import Scan from "../pages/pos_mitra/Scan";
-import ProfilePosMitra from "../pages/pos_mitra/Profile";
-import EditProfilePosMitra from "../pages/pos_mitra/EditProfile";
-import AturPINPosMitra from "../pages/pos_mitra/AturPin";
-import AturPasswordPosMitra from "../pages/pos_mitra/AturPassword";
+const DashboardPosMitra = lazy(() => import("../pages/pos_mitra/Dashboard"));
+const Aktivitas = lazy(() => import("../pages/pos_mitra/Aktivitas"));
+const DetailAktivitas = lazy(() => import("../pages/pos_mitra/DetailAktivitas"));
+const Scan = lazy(() => import("../pages/pos_mitra/Scan"));
+const ProfilePosMitra = lazy(() => import("../pages/pos_mitra/Profile"));
+const EditProfilePosMitra = lazy(() => import("../pages/pos_mitra/EditProfile"));
+const AturPINPosMitra = lazy(() => import("../pages/pos_mitra/AturPin"));
+const AturPasswordPosMitra = lazy(() => import("../pages/pos_mitra/AturPassword"));
+
+function RouteLoadingFallback() {
+	return (
+		<div className="h-screen w-full flex items-center justify-center bg-gray-50">
+			<div className="flex flex-col items-center gap-3">
+				<div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-900 rounded-full animate-spin"></div>
+				<p className="text-xs font-black text-indigo-900 uppercase tracking-widest">Memuat halaman...</p>
+			</div>
+		</div>
+	);
+}
 
 function AppRouter() {
 	return (
+		<Suspense fallback={<RouteLoadingFallback />}>
 		<Routes>
 			{/* PUBLIC */}
 			<Route path="/" element={<Login />} />
@@ -846,6 +863,7 @@ function AppRouter() {
 				}
 			/>
 		</Routes>
+		</Suspense>
 	);
 }
 
