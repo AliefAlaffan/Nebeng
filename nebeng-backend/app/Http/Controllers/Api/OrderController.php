@@ -14,6 +14,7 @@ use App\Models\DriverBalance;
 use App\Models\BalanceTransaction;
 use App\Events\NewOrderNotification;
 use Illuminate\Support\Facades\Storage;
+use App\Services\NotificationService;
 
 class OrderController extends Controller
 {
@@ -55,6 +56,23 @@ class OrderController extends Controller
 
         broadcast(new NewOrderNotification($order));
 
+        // ================= NOTIFIKASI =================
+        NotificationService::send(
+            $order->customer_id,
+            'Pesanan Berhasil Dibuat',
+            "Pesanan tebengan kamu ke {$trip->destinationPoint->pos_name} berhasil dibuat. Total Rp" . number_format($order->price, 0, ',', '.') . '.',
+            'order',
+            "/customer/perjalanan/{$trip->id}"
+        );
+
+        NotificationService::send(
+            $trip->mitra_id,
+            'Ada Customer Baru',
+            "{$order->customer->name} baru saja memesan tebengan kamu.",
+            'order',
+            "/mitra/perjalanan/{$trip->id}"
+        );
+
         $conversation = Conversation::firstOrCreate([
             'customer_id' => auth()->id(),
             'mitra_id' => $trip->mitra_id
@@ -93,6 +111,16 @@ class OrderController extends Controller
             'points' => $points,
             'description' => 'Poin dari pemesanan trip #' . $trip->id
         ]);
+
+        if ($points > 0) {
+            NotificationService::send(
+                $user->id,
+                'Dapat Poin Hadiah',
+                "Kamu mendapat {$points} poin dari pemesanan ini.",
+                'reward',
+                '/customer/reward-points'
+            );
+        }
 
         $trip->decrement('seat_available');
 
@@ -171,6 +199,14 @@ class OrderController extends Controller
             'payment_status' => 'waiting_confirmation',
         ]);
 
+        NotificationService::send(
+            $order->trip->mitra_id,
+            'Perlu Konfirmasi Pembayaran',
+            'Customer sudah upload bukti pembayaran QRIS. Cek dan konfirmasi di halaman perjalanan.',
+            'payment',
+            "/mitra/perjalanan/{$order->trip_id}"
+        );
+
         return response()->json([
             'message' => 'Bukti pembayaran berhasil dikirim. Menunggu konfirmasi mitra.',
             'order' => $order,
@@ -221,6 +257,22 @@ class OrderController extends Controller
             'amount' => $order->price,
             'description' => 'Pendapatan dari order #' . $order->id . ' (QRIS terkonfirmasi)'
         ]);
+
+        NotificationService::send(
+            $order->customer_id,
+            'Pembayaran Dikonfirmasi',
+            'Mitra telah mengonfirmasi pembayaran kamu. Lanjutkan ke halaman perjalanan.',
+            'payment',
+            "/customer/perjalanan/{$order->trip_id}"
+        );
+
+        NotificationService::send(
+            $mitraId,
+            'Saldo Bertambah',
+            'Rp' . number_format($order->price, 0, ',', '.') . " masuk ke saldo kamu dari order #{$order->id}.",
+            'payment',
+            "/mitra/riwayat-saldo"
+        );
 
         return response()->json([
             'message' => 'Pembayaran berhasil dikonfirmasi.',

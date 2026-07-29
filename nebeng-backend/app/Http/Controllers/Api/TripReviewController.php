@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Trip;
 use App\Models\TripReview;
 use Illuminate\Http\Request;
+use App\Services\NotificationService;
 
 class TripReviewController extends Controller
 {
@@ -47,6 +48,14 @@ class TripReviewController extends Controller
                 'rating' => $request->rating,
                 'review' => $request->review,
             ]);
+
+            NotificationService::send(
+                $trip->mitra_id,
+                'Rating Baru',
+                "{$authUser->name} memberi kamu rating {$request->rating}/5 untuk perjalanan ini.",
+                'rating',
+                "/mitra/riwayat"
+            );
         }
 
         // =========================
@@ -83,6 +92,14 @@ class TripReviewController extends Controller
                 'rating' => $request->rating,
                 'review' => $request->review,
             ]);
+
+            NotificationService::send(
+                $request->reviewed_user_id,
+                'Rating Baru',
+                "Mitra memberi kamu rating {$request->rating}/5 untuk perjalanan ini.",
+                'rating',
+                "/customer/riwayat"
+            );
         }
 
         return response()->json([

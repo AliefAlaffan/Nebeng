@@ -1,18 +1,48 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MitraLayout from "../../components/dashboard/MitraLayout";
-import { ChevronLeft, Bell, Trash2, CheckCheck, Clock, Tag, Megaphone, Info } from "lucide-react";
+import { ChevronLeft, Bell, Trash2, CheckCheck, Clock, Tag, ShoppingBag, Wallet, Car, ShieldCheck, Star, Loader2 } from "lucide-react";
 
 export default function Notifikasi() {
 	const navigate = useNavigate();
+
 	const [searchTerm, setSearchTerm] = useState("");
 	const [activeFilter, setActiveFilter] = useState("Semua");
-
-	const filters = ["Semua", "Promo", "Info Perjalanan", "Sistem"];
-
 	const [notifications, setNotifications] = useState([]);
+	const [isLoading, setIsLoading] = useState(true);
 
-	// Fungsionalitas Filter & Search
+	const filters = ["Semua", "order", "payment", "trip", "verification", "rating", "system"];
+	const filterLabels = {
+		Semua: "Semua",
+		order: "Pesanan",
+		payment: "Pembayaran",
+		trip: "Perjalanan",
+		verification: "Verifikasi",
+		rating: "Rating",
+		system: "Sistem",
+	};
+
+	useEffect(() => {
+		const fetchNotifications = async () => {
+			try {
+				const token = localStorage.getItem("token");
+
+				const res = await fetch("http://127.0.0.1:8000/api/notifications", {
+					headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+				});
+
+				const data = await res.json();
+				setNotifications(Array.isArray(data) ? data : []);
+			} catch (err) {
+				console.error("Fetch notifikasi error:", err);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		fetchNotifications();
+	}, []);
+
 	const filteredNotifications = useMemo(() => {
 		return notifications.filter((n) => {
 			const matchesFilter = activeFilter === "Semua" || n.category === activeFilter;
@@ -21,81 +51,54 @@ export default function Notifikasi() {
 		});
 	}, [notifications, activeFilter, searchTerm]);
 
-	const markAllRead = () => {
-		const updated = notifications.map((n) => ({
-			...n,
-			isRead: true,
-		}));
+	const markAllRead = async () => {
+		setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
 
-		setNotifications(updated);
-
-		localStorage.setItem("mitra_notifications", JSON.stringify(updated));
-
-		localStorage.setItem("mitra_has_new_notif", "false");
-	};
-
-	const deleteNotification = (id) => {
-		const updated = notifications.filter((n) => n.id !== id);
-
-		setNotifications(updated);
-
-		localStorage.setItem("mitra_notifications", JSON.stringify(updated));
-	};
-
-	useEffect(() => {
-		const saved = localStorage.getItem("mitra_notifications");
-
-		if (saved) {
-			setNotifications(JSON.parse(saved));
+		try {
+			const token = localStorage.getItem("token");
+			await fetch("http://127.0.0.1:8000/api/notifications/mark-all-read", {
+				method: "POST",
+				headers: { Authorization: `Bearer ${token}` },
+			});
+		} catch (err) {
+			console.error(err);
 		}
-	}, []);
+	};
+
+	const deleteNotification = async (id) => {
+		setNotifications((prev) => prev.filter((n) => n.id !== id));
+
+		try {
+			const token = localStorage.getItem("token");
+			await fetch(`http://127.0.0.1:8000/api/notifications/${id}`, {
+				method: "DELETE",
+				headers: { Authorization: `Bearer ${token}` },
+			});
+		} catch (err) {
+			console.error(err);
+		}
+	};
+
+	const handleClick = (n) => {
+		if (n.link) navigate(n.link);
+	};
 
 	const getNotificationStyle = (category) => {
 		switch (category) {
-			case "Promo":
-				return {
-					icon: Megaphone,
-					color: "text-amber-500",
-					bg: "bg-amber-50",
-				};
-
-			case "Info Perjalanan":
-				return {
-					icon: Clock,
-					color: "text-indigo-500",
-					bg: "bg-indigo-50",
-				};
-
+			case "order":
+				return { icon: ShoppingBag, color: "text-amber-500", bg: "bg-amber-50" };
+			case "payment":
+				return { icon: Wallet, color: "text-emerald-500", bg: "bg-emerald-50" };
+			case "trip":
+				return { icon: Car, color: "text-indigo-500", bg: "bg-indigo-50" };
+			case "verification":
+				return { icon: ShieldCheck, color: "text-sky-500", bg: "bg-sky-50" };
+			case "rating":
+				return { icon: Star, color: "text-yellow-500", bg: "bg-yellow-50" };
 			default:
-				return {
-					icon: Info,
-					color: "text-blue-500",
-					bg: "bg-blue-50",
-				};
+				return { icon: Bell, color: "text-blue-500", bg: "bg-blue-50" };
 		}
 	};
-
-	useEffect(() => {
-		const saved = localStorage.getItem("mitra_notifications");
-
-		if (saved) {
-			const parsed = JSON.parse(saved);
-
-			// semua notif jadi read
-			const updated = parsed.map((n) => ({
-				...n,
-				isRead: true,
-			}));
-
-			// simpan ulang
-			localStorage.setItem("mitra_notifications", JSON.stringify(updated));
-
-			setNotifications(updated);
-
-			// reset indikator unread
-			localStorage.setItem("mitra_has_new_notif", "false");
-		}
-	}, []);
 
 	return (
 		<MitraLayout>
@@ -148,7 +151,7 @@ export default function Notifikasi() {
 										}`}
 									>
 										<Tag size={16} className={activeFilter === f ? "text-indigo-300" : "text-gray-400"} />
-										{f}
+										{filterLabels[f]}
 									</button>
 								))}
 							</div>
@@ -157,15 +160,24 @@ export default function Notifikasi() {
 
 					{/* SISI KANAN: Daftar Notifikasi (9 Kolom) */}
 					<div className="lg:col-span-9 space-y-4">
-						{filteredNotifications.length > 0 ? (
+						{isLoading ? (
+							<div className="flex items-center justify-center py-20 text-gray-400 gap-2 bg-white rounded-[40px] border border-gray-100">
+								<Loader2 className="animate-spin" size={20} /> Memuat notifikasi...
+							</div>
+						) : filteredNotifications.length > 0 ? (
 							filteredNotifications.map((n) => (
-								<div key={n.id} className={`group bg-white rounded-[32px] p-6 shadow-sm border transition-all hover:shadow-md ${!n.isRead ? "border-l-4 border-l-indigo-600 border-gray-100" : "border-gray-50 opacity-80"}`}>
+								<div
+									key={n.id}
+									onClick={() => handleClick(n)}
+									className={`group bg-white rounded-[32px] p-6 shadow-sm border transition-all hover:shadow-md ${n.link ? "cursor-pointer" : ""} ${
+										!n.is_read ? "border-l-4 border-l-indigo-600 border-gray-100" : "border-gray-50 opacity-80"
+									}`}
+								>
 									<div className="flex gap-4">
 										<div className={`p-4 ${getNotificationStyle(n.category).bg} ${getNotificationStyle(n.category).color} rounded-[22px] shrink-0 h-fit group-hover:scale-110 transition-transform`}>
 											{(() => {
 												const style = getNotificationStyle(n.category);
 												const Icon = style.icon;
-
 												return <Icon size={24} />;
 											})()}
 										</div>
@@ -173,15 +185,21 @@ export default function Notifikasi() {
 										<div className="flex-1 min-w-0">
 											<div className="flex justify-between items-start mb-1">
 												<h3 className="text-base font-black text-indigo-900 truncate pr-4">{n.title}</h3>
-												<button onClick={() => deleteNotification(n.id)} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														deleteNotification(n.id);
+													}}
+													className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+												>
 													<Trash2 size={16} />
 												</button>
 											</div>
 											<p className="text-sm text-gray-500 leading-relaxed mb-4 line-clamp-2 group-hover:line-clamp-none transition-all duration-500">{n.message}</p>
 											<div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
 												<Clock size={12} />
-												{n.date}
-												{!n.isRead && <span className="ml-2 w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>}
+												{new Date(n.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+												{!n.is_read && <span className="ml-2 w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>}
 											</div>
 										</div>
 									</div>
@@ -193,7 +211,7 @@ export default function Notifikasi() {
 									<Bell size={48} className="text-indigo-200" />
 								</div>
 								<h3 className="text-lg font-bold text-indigo-900">Belum ada notifikasi</h3>
-								<p className="text-sm text-gray-400 max-w-xs mx-auto">Notifikasi tentang perjalanan, promo, dan sistem akan muncul di sini.</p>
+								<p className="text-sm text-gray-400 max-w-xs mx-auto">Notifikasi tentang pesanan, pembayaran, dan sistem akan muncul di sini.</p>
 							</div>
 						)}
 					</div>

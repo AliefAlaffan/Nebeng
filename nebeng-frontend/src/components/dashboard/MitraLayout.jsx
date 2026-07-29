@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "react-router-dom";
 import MitraSidebar from "./MitraSidebar";
 import { Menu, Bell, Search, ChevronDown, Bike, X } from "lucide-react";
-import echo from "../../lib/echo";
 import { useUser } from "../../context/UserContext";
 
 export default function MitraLayout({ children }) {
@@ -11,99 +10,70 @@ export default function MitraLayout({ children }) {
 	const location = useLocation();
 	const { user, loadingUser } = useUser();
 	const [notifications, setNotifications] = useState([]);
-	const [hasNewNotif, setHasNewNotif] = useState(() => {
-		return localStorage.getItem("mitra_has_new_notif") === "true";
-	});
+	const [hasNewNotif, setHasNewNotif] = useState(false);
 	const [popupNotif, setPopupNotif] = useState(null);
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
 	const notificationSound = useRef(null);
 
+	// Polling badge notifikasi (menggantikan WebSocket/Echo yang belum
+	// terkonfigurasi di project ini, supaya notifikasi tetap berfungsi
+	// tanpa perlu infrastruktur broadcasting tambahan).
 	useEffect(() => {
-		console.log("LISTENING WEBSOCKET...");
+		let previousCount = null;
 
-		const storedUser = localStorage.getItem("user");
+		const fetchUnreadCount = async () => {
+			try {
+				const token = localStorage.getItem("token");
+				if (!token) return;
 
-		const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+				const res = await fetch("http://127.0.0.1:8000/api/notifications/unread-count", {
+					headers: { Authorization: `Bearer ${token}` },
+				});
 
-		const userId = parsedUser?.id;
+				const data = await res.json();
+				const count = data.unread_count || 0;
 
-		console.log("USER ID:", userId);
+				// Kalau jumlah belum-dibaca bertambah sejak polling terakhir,
+				// ada notifikasi baru -> tampilkan popup singkat + suara + getar.
+				if (previousCount !== null && count > previousCount) {
+					setPopupNotif({
+						message: "Kamu punya notifikasi baru",
+						orderId: null,
+					});
 
-		if (!userId) return;
+					setTimeout(() => {
+						setPopupNotif(null);
+					}, 4000);
 
-		const channel = echo.private(`mitra.${userId}`);
+					if (notificationSound.current) {
+						try {
+							notificationSound.current.currentTime = 0;
 
-		channel.subscribed(() => {
-			console.log("BERHASIL SUBSCRIBE CHANNEL");
-		});
+							notificationSound.current.play();
+						} catch (err) {
+							console.log("PLAY FAILED", err);
+						}
+					}
 
-		channel.error((err) => {
-			console.error("CHANNEL ERROR:", err);
-		});
-
-		channel.listen(".new-order", (e) => {
-			console.log("EVENT MASUK:", e);
-
-			setNotifications((prev) => {
-				const updated = [
-					{
-						id: Date.now(),
-						category: "Info Perjalanan",
-						title: "Order Baru Masuk 🚀",
-						message: e.message,
-						date: new Date().toLocaleString("id-ID"),
-						isRead: false,
-						orderId: e.order_id,
-					},
-					...prev,
-				];
-
-				localStorage.setItem("mitra_notifications", JSON.stringify(updated));
-
-				return updated;
-			});
-
-			setHasNewNotif(true);
-
-			localStorage.setItem("mitra_has_new_notif", "true");
-
-			setPopupNotif({
-				message: e.message,
-				orderId: e.order_id,
-			});
-
-			// auto hide popup
-			setTimeout(() => {
-				setPopupNotif(null);
-			}, 4000);
-
-			if (notificationSound.current) {
-				try {
-					notificationSound.current.currentTime = 0;
-
-					notificationSound.current.play();
-				} catch (err) {
-					console.log("PLAY FAILED", err);
+					if (navigator.vibrate) {
+						navigator.vibrate([200, 100, 200]);
+					}
 				}
-			}
 
-			// vibrate mobile
-			if (navigator.vibrate) {
-				navigator.vibrate([200, 100, 200]);
-			}
-		});
+				previousCount = count;
 
-		return () => {
-			echo.leave(`private-mitra.${userId}`);
+				setNotifications(new Array(count).fill(true));
+				setHasNewNotif(count > 0);
+			} catch (err) {
+				console.error("Fetch unread notif count error:", err);
+			}
 		};
-	}, []);
 
-	useEffect(() => {
-		const saved = localStorage.getItem("mitra_notifications");
+		fetchUnreadCount();
 
-		if (saved) {
-			setNotifications(JSON.parse(saved));
-		}
+		const interval = setInterval(fetchUnreadCount, 15000);
+
+		return () => clearInterval(interval);
 	}, []);
 
 	// Menentukan judul halaman berdasarkan path
@@ -242,7 +212,7 @@ export default function MitraLayout({ children }) {
 
 									<p className="text-xs text-gray-500 mt-1 leading-relaxed">{popupNotif.message}</p>
 
-									<p className="text-[11px] text-indigo-500 font-bold mt-2">Order #{popupNotif.orderId}</p>
+									{popupNotif.orderId && <p className="text-[11px] text-indigo-500 font-bold mt-2">Order #{popupNotif.orderId}</p>}
 								</div>
 
 								{/* CLOSE */}

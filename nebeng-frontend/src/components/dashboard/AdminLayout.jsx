@@ -9,7 +9,33 @@ export default function AdminLayout({ children }) {
 	const location = useLocation();
 	const [user, setUser] = useState(null);
 	const [loadingUser, setLoadingUser] = useState(true);
+	const [hasNewNotif, setHasNewNotif] = useState(false);
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
+
+	// Polling badge notifikasi belum dibaca
+	useEffect(() => {
+		const fetchUnreadCount = async () => {
+			try {
+				const token = localStorage.getItem("token");
+				if (!token) return;
+
+				const res = await fetch("http://127.0.0.1:8000/api/notifications/unread-count", {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+
+				const data = await res.json();
+				setHasNewNotif((data.unread_count || 0) > 0);
+			} catch (err) {
+				console.error("Fetch unread notif count error:", err);
+			}
+		};
+
+		fetchUnreadCount();
+
+		const interval = setInterval(fetchUnreadCount, 15000);
+
+		return () => clearInterval(interval);
+	}, []);
 
 	// Efek shadow pada header saat di-scroll
 	useEffect(() => {
@@ -93,7 +119,7 @@ export default function AdminLayout({ children }) {
 						>
 							<Bell size={20} />
 							{/* Red Dot Indicator */}
-							<span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-indigo-900 md:border-white"></span>
+							{hasNewNotif && <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-indigo-900 md:border-white"></span>}
 						</Link>
 
 						{/* Profile Dropdown: Sembunyikan di Mobile, Muncul di Desktop */}

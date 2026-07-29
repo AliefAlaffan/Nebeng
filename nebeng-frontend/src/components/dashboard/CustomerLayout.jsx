@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
 import CustomerSidebar from "./CustomerSidebar";
 import { Menu, Bell, Search, ChevronDown } from "lucide-react";
-import echo from "../../lib/echo";
 import { useUser } from "../../context/UserContext";
 
 export default function CustomerLayout({ children }) {
@@ -15,27 +14,30 @@ export default function CustomerLayout({ children }) {
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
 
 	useEffect(() => {
-		const userId = localStorage.getItem("user_id");
+		const fetchUnreadCount = async () => {
+			try {
+				const token = localStorage.getItem("token");
+				if (!token) return;
 
-		if (!userId) return;
+				const res = await fetch("http://127.0.0.1:8000/api/notifications/unread-count", {
+					headers: { Authorization: `Bearer ${token}` },
+				});
 
-		const channel = echo.private(`customer.${userId}`);
+				const data = await res.json();
 
-		channel.listen(".order-updated", (e) => {
-			console.log("NOTIFICATION:", e);
-
-			setNotifications((prev) => [e, ...prev]);
-
-			setHasNewNotif(true);
-
-			// optional sound
-			const audio = new Audio("/notification.mp3");
-			audio.play().catch(() => {});
-		});
-
-		return () => {
-			echo.leave(`private-customer.${userId}`);
+				setNotifications(new Array(data.unread_count || 0).fill(true));
+				setHasNewNotif((data.unread_count || 0) > 0);
+			} catch (err) {
+				console.error("Fetch unread notif count error:", err);
+			}
 		};
+
+		fetchUnreadCount();
+
+		// Polling berkala supaya badge notifikasi selalu terkini
+		const interval = setInterval(fetchUnreadCount, 15000);
+
+		return () => clearInterval(interval);
 	}, []);
 
 	// Menentukan judul halaman berdasarkan path

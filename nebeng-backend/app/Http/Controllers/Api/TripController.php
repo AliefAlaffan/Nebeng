@@ -12,7 +12,7 @@ use App\Models\TripQrSession;
 use App\Models\PickupPoint;
 use App\Services\Maps\OSRMService;
 use App\Services\Pricing\TripPricingService;
-use App\Models\DriverBalance;
+use App\Services\NotificationService;
 
 class TripController extends Controller
 {
@@ -98,6 +98,17 @@ class TripController extends Controller
                 'max_cap' =>
                     'nullable|integer|min:1',
             ]);
+
+            // ====================================
+            // VALIDASI KAPASITAS SESUAI KENDARAAN TERDAFTAR
+            // ====================================
+            $vehicle = $request->user()->vehicle;
+
+            if ($vehicle && $request->seat_total > $vehicle->seat_capacity) {
+                return response()->json([
+                    'message' => "Jumlah kursi tidak boleh melebihi kapasitas kendaraan terdaftar ({$vehicle->seat_capacity} penumpang)."
+                ], 422);
+            }
 
             // ====================================
             // AMBIL PICKUP POINT
@@ -496,69 +507,6 @@ if ($request->tebengan_type === "Barang") {
         return response()->json($trips);
     }
 
-    // Endpoint gabungan khusus dashboard mitra: saldo + 2 trip terdekat yang
-    // akan datang. Filter tanggal & limit dilakukan di query, bukan di
-    // frontend, supaya tidak perlu tarik seluruh riwayat trip tiap buka
-    // dashboard.
-    public function dashboardSummary(Request $request)
-    {
-        $user = $request->user();
-
-        $balance = DriverBalance::firstOrCreate(
-            ['user_id' => $user->id],
-            ['balance' => 0]
-        );
-
-        $now = now();
-
-        $upcomingTrips = Trip::with([
-            'originPoint.city',
-            'destinationPoint.city'
-        ])
-        ->where('mitra_id', $user->id)
-        ->where('status', '!=', 'completed')
-        ->where(function ($q) use ($now) {
-            $q->where('departure_date', '>', $now->toDateString())
-              ->orWhere(function ($q2) use ($now) {
-                  $q2->where('departure_date', '=', $now->toDateString())
-                     ->where('departure_time', '>=', $now->toTimeString());
-              });
-        })
-        ->orderBy('departure_date')
-        ->orderBy('departure_time')
-        ->limit(2)
-        ->get()
-        ->map(function ($trip) {
-            $rawStatus = $trip->status;
-
-            if ($rawStatus === 'cancelled') {
-                $status = 'Dibatalkan';
-            } elseif ($rawStatus === 'completed') {
-                $status = 'Selesai';
-            } else {
-                $status = 'Proses';
-            }
-
-            return [
-                'id' => $trip->id,
-                'vehicle_type' => $trip->vehicle_type,
-                'departure_date' => $trip->departure_date,
-                'departure_time' => $trip->departure_time,
-                'price' => $trip->price,
-                'status' => $status,
-                'seat_total' => $trip->seat_total,
-                'seat_available' => $trip->seat_available,
-                'origin_point' => $trip->originPoint,
-                'destination_point' => $trip->destinationPoint,
-            ];
-        });
-
-        return response()->json([
-            'balance' => $balance->balance,
-            'upcoming_trips' => $upcomingTrips,
-        ]);
-    }
-
     public function posMitraTrips()
     {
         $trips = \App\Models\Trip::with([
@@ -654,15 +602,33 @@ if ($request->tebengan_type === "Barang") {
             'status' => 'completed'
         ]);
 
-        // Ikut selesaikan semua order yang terkait trip ini, supaya
-        // riwayat pesanan customer ikut ter-update jadi "Selesai" -
-        // sebelumnya cuma status Trip yang di-update di sini, Order-nya
-        // kelewat, jadi customer lihat "Dalam Proses" terus walau
-        // trip-nya sudah beneran selesai.
+        $session->trip->load('orders');
+
+        NotificationService::send(
+            $session->trip->mitra_id,
+            'Perjalanan Selesai',
+            'Trip kamu telah selesai. Saldo akan bertambah setelah pembayaran dikonfirmasi.',
+            'trip',
+            "/mitra/riwayat"
+        );
+
         foreach ($session->trip->orders as $order) {
-            $order->status = 'completed';
-            $order->save();
+            NotificationService::send(
+                $order->customer_id,
+                'Perjalanan Selesai',
+                'Kamu sudah sampai tujuan. Jangan lupa beri penilaian untuk mitra (opsional).',
+                'trip',
+                "/customer/perjalanan/{$session->trip->id}"
+            );
         }
+
+        NotificationService::send(
+            auth()->id(),
+            'QR Kedatangan Terverifikasi',
+            "Trip #{$session->trip->id} berhasil diselesaikan.",
+            'system',
+            '/pos-mitra/aktivitas'
+        );
 
         return response()->json([
             'message' => 'Trip berhasil diselesaikan',
@@ -703,17 +669,6 @@ if ($request->tebengan_type === "Barang") {
             ], 400);
         }
 
-        // Lapis kedua: pastikan semua customer di trip ini sudah check-in
-        // sebelum benar-benar diberangkatkan (jaga-jaga kalau QR keberangkatan
-        // sempat ke-generate sebelum semua customer selesai scan).
-        $notReadyCount = $session->trip->orders()->where('readiness_status', '!=', 'ready')->count();
-
-        if ($notReadyCount > 0) {
-            return response()->json([
-                'message' => 'Masih ada customer yang belum check-in (scan QR) di Pos Mitra.'
-            ], 422);
-        }
-
         $session->update([
             'is_used' => true,
             'used_at' => now(),
@@ -722,6 +677,34 @@ if ($request->tebengan_type === "Barang") {
         $session->trip->update([
             'status' => 'on_the_way'
         ]);
+
+        $session->trip->load('orders');
+
+        NotificationService::send(
+            $session->trip->mitra_id,
+            'Perjalanan Dimulai',
+            'QR keberangkatan berhasil diverifikasi. Selamat menempuh perjalanan.',
+            'trip',
+            "/mitra/perjalanan/{$session->trip->id}"
+        );
+
+        foreach ($session->trip->orders as $order) {
+            NotificationService::send(
+                $order->customer_id,
+                'Perjalanan Dimulai',
+                'Mitra sudah berangkat. Pantau perjalanan kamu secara langsung.',
+                'trip',
+                "/customer/perjalanan/{$session->trip->id}"
+            );
+        }
+
+        NotificationService::send(
+            auth()->id(),
+            'QR Keberangkatan Terverifikasi',
+            "Trip #{$session->trip->id} berhasil diberangkatkan.",
+            'system',
+            '/pos-mitra/aktivitas'
+        );
 
         return response()->json([
             'message' => 'Perjalanan dimulai',
@@ -770,9 +753,15 @@ if ($request->tebengan_type === "Barang") {
             'readiness_status' => 'ready'
         ]);
 
-        // Broadcast realtime: layar customer & dashboard mitra ikut update
-        // otomatis tanpa perlu di-refresh manual
-        event(new \App\Events\CustomerReadyNotification($session->order->load(['trip', 'customer'])));
+        $session->order->load('trip', 'customer');
+
+        NotificationService::send(
+            $session->order->trip->mitra_id,
+            'Customer Sudah Check-in',
+            "{$session->order->customer->name} sudah check-in di Pos Mitra. Cek apakah semua customer sudah siap berangkat.",
+            'trip',
+            "/mitra/perjalanan/{$session->order->trip_id}"
+        );
 
         return response()->json([
             'message' => 'Customer berhasil diverifikasi',

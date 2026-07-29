@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "react-router-dom";
 import PosMitraSidebar from "./PosMitraSidebar";
 import { Bell, ChevronDown, QrCode, X } from "lucide-react";
-import echo from "../../lib/echo";
 
 export default function PosMitraLayout({ children }) {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -11,9 +10,7 @@ export default function PosMitraLayout({ children }) {
 	const [user, setUser] = useState(null);
 	const [loadingUser, setLoadingUser] = useState(true);
 	const [notifications, setNotifications] = useState([]);
-	const [hasNewNotif, setHasNewNotif] = useState(() => {
-		return localStorage.getItem("mitra_has_new_notif") === "true";
-	});
+	const [hasNewNotif, setHasNewNotif] = useState(false);
 	const [popupNotif, setPopupNotif] = useState(null);
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
 	const notificationSound = useRef(null);
@@ -57,70 +54,62 @@ export default function PosMitraLayout({ children }) {
 		fetchUser();
 	}, []);
 
-	// Sinkronisasi WebSocket Echo untuk Pesanan Masuk POS
+	// Polling badge notifikasi (menggantikan WebSocket/Echo yang belum
+	// terkonfigurasi di project ini, supaya notifikasi tetap berfungsi
+	// tanpa perlu infrastruktur broadcasting tambahan).
 	useEffect(() => {
-		const storedUser = localStorage.getItem("user");
-		const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-		const userId = parsedUser?.id;
+		let previousCount = null;
 
-		if (!userId) return;
+		const fetchUnreadCount = async () => {
+			try {
+				const token = localStorage.getItem("token");
+				if (!token) return;
 
-		const channel = echo.private(`mitra.${userId}`);
+				const res = await fetch("http://127.0.0.1:8000/api/notifications/unread-count", {
+					headers: { Authorization: `Bearer ${token}` },
+				});
 
-		channel.listen(".new-order", (e) => {
-			setNotifications((prev) => {
-				const updated = [
-					{
-						id: Date.now(),
-						category: "Info Layanan",
-						title: "Pesanan Baru Masuk 🚀",
-						message: e.message,
-						date: new Date().toLocaleString("id-ID"),
-						isRead: false,
-						orderId: e.order_id,
-					},
-					...prev,
-				];
-				localStorage.setItem("mitra_notifications", JSON.stringify(updated));
-				return updated;
-			});
+				const data = await res.json();
+				const count = data.unread_count || 0;
 
-			setHasNewNotif(true);
-			localStorage.setItem("mitra_has_new_notif", "true");
+				if (previousCount !== null && count > previousCount) {
+					setPopupNotif({
+						message: "Kamu punya notifikasi baru",
+						orderId: null,
+					});
 
-			setPopupNotif({
-				message: e.message,
-				orderId: e.order_id,
-			});
+					setTimeout(() => {
+						setPopupNotif(null);
+					}, 4000);
 
-			setTimeout(() => {
-				setPopupNotif(null);
-			}, 4000);
+					if (notificationSound.current) {
+						try {
+							notificationSound.current.currentTime = 0;
+							notificationSound.current.play();
+						} catch (err) {
+							console.log("Gagal memutar audio notifikasi", err);
+						}
+					}
 
-			if (notificationSound.current) {
-				try {
-					notificationSound.current.currentTime = 0;
-					notificationSound.current.play();
-				} catch (err) {
-					console.log("Gagal memutar audio notifikasi", err);
+					if (navigator.vibrate) {
+						navigator.vibrate([200, 100, 200]);
+					}
 				}
-			}
 
-			if (navigator.vibrate) {
-				navigator.vibrate([200, 100, 200]);
-			}
-		});
+				previousCount = count;
 
-		return () => {
-			echo.leave(`private-mitra.${userId}`);
+				setNotifications(new Array(count).fill(true));
+				setHasNewNotif(count > 0);
+			} catch (err) {
+				console.error("Fetch unread notif count error:", err);
+			}
 		};
-	}, []);
 
-	useEffect(() => {
-		const saved = localStorage.getItem("mitra_notifications");
-		if (saved) {
-			setNotifications(JSON.parse(saved));
-		}
+		fetchUnreadCount();
+
+		const interval = setInterval(fetchUnreadCount, 15000);
+
+		return () => clearInterval(interval);
 	}, []);
 
 	// Penyesuaian nama halaman berdasarkan path URL untuk Breadcrumb Desktop
@@ -240,7 +229,7 @@ export default function PosMitraLayout({ children }) {
 										<div className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-bold uppercase tracking-wide">Baru</div>
 									</div>
 									<p className="text-xs text-gray-500 mt-1 leading-relaxed">{popupNotif.message}</p>
-									<p className="text-[10px] text-[#0b2f83] font-semibold mt-1.5">ID Transaksi #{popupNotif.orderId}</p>
+									{popupNotif.orderId && <p className="text-[10px] text-[#0b2f83] font-semibold mt-1.5">ID Transaksi #{popupNotif.orderId}</p>}
 								</div>
 
 								<button onClick={() => setPopupNotif(null)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors">

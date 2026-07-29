@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\CustomerOrderQrController;
 use App\Http\Controllers\Api\AdminPricingController;
 use App\Http\Controllers\Api\AdminPickupPointController;
 use App\Http\Controllers\Api\MitraVehicleController;
+use App\Http\Controllers\Api\NotificationController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -48,6 +49,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/update-pin', [PinController::class, 'updatePin']);
     Route::post('/update-password', [PasswordController::class, 'updatePassword']);
     Route::post('/verify-pin', [PinController::class, 'verifyPin']);
+
+    // NOTIFIKASI (berlaku untuk semua role yang login)
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 
 });
 
