@@ -30,6 +30,7 @@ const ProfileAdmin = lazy(() => import("../pages/admin/Profile"));
 const EditProfileAdmin = lazy(() => import("../pages/admin/EditProfile"));
 const AturPasswordAdmin = lazy(() => import("../pages/customer/AturPassword"));
 const AturHarga = lazy(() => import("../pages/admin/PricingManagement"));
+const PickupPointManagement = lazy(() => import("../pages/admin/PickupPointManagement"));
 
 /* CUSTOMER */
 const DashboardCustomer = lazy(() => import("../pages/customer/Dashboard"));
@@ -171,6 +172,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="admin">
 						<AturHarga />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/admin/pengaturan/pickup-point"
+				element={
+					<ProtectedRoute role="admin">
+						<PickupPointManagement />
 					</ProtectedRoute>
 				}
 			/>
