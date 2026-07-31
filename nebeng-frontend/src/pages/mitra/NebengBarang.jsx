@@ -30,13 +30,44 @@ export default function NebengBarang() {
 	];
 
 	const vehicleOptions = [
-		{ id: "Barang-Motor", label: "Motor" },
-		{ id: "Barang-Mobil", label: "Mobil" },
-		{ id: "Barang-Bus", label: "Bus" },
-		{ id: "Barang-Kapal", label: "Kapal" },
-		{ id: "Barang-Pesawat", label: "Pesawat" },
-		{ id: "Barang-Kereta", label: "Kereta" },
+		{ id: "Barang-Motor", label: "Motor", regType: "motor" },
+		{ id: "Barang-Mobil", label: "Mobil", regType: "mobil" },
 	];
+
+	// Kendaraan yang benar-benar terdaftar mitra (dari halaman verifikasi /
+	// Status Akun) - jenis kendaraan yang bisa dipilih di sini dibatasi
+	// hanya yang sudah didaftarkan, bukan bebas pilih apapun.
+	const [myVehicles, setMyVehicles] = useState([]);
+	const [loadingVehicles, setLoadingVehicles] = useState(true);
+
+	useEffect(() => {
+		const fetchMyVehicles = async () => {
+			try {
+				const token = localStorage.getItem("token");
+
+				const res = await fetch("http://127.0.0.1:8000/api/mitra/vehicles", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+					},
+				});
+
+				if (res.ok) {
+					const data = await res.json();
+					setMyVehicles(data);
+				}
+			} catch (err) {
+				console.error("Gagal ambil kendaraan terdaftar:", err);
+			} finally {
+				setLoadingVehicles(false);
+			}
+		};
+
+		fetchMyVehicles();
+	}, []);
+
+	const registeredTypes = new Set(myVehicles.map((v) => v.type));
+	const availableVehicleOptions = vehicleOptions.filter((opt) => registeredTypes.has(opt.regType));
 
 	const filteredBaggageOptions = baggageOptions.filter((option) => {
 		if (vehicleType === "Barang-Motor") {
@@ -44,22 +75,6 @@ export default function NebengBarang() {
 		}
 
 		if (vehicleType === "Barang-Mobil") {
-			return ["xxs", "xs", "kecil", "sedang", "besar"].includes(option.id);
-		}
-
-		if (vehicleType === "Barang-Pesawat") {
-			return ["xxs", "xs", "kecil"].includes(option.id);
-		}
-
-		if (vehicleType === "Barang-Kereta") {
-			return ["xxs", "xs", "kecil", "sedang"].includes(option.id);
-		}
-
-		if (vehicleType === "Barang-Kapal") {
-			return true;
-		}
-
-		if (vehicleType === "Barang-Bus") {
 			return ["xxs", "xs", "kecil", "sedang", "besar"].includes(option.id);
 		}
 
@@ -253,18 +268,23 @@ export default function NebengBarang() {
 								setVehicleType(e.target.value);
 								setBaggageCapacity("");
 							}}
-							className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-indigo-900 focus:outline-none"
+							disabled={loadingVehicles || availableVehicleOptions.length === 0}
+							className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-indigo-900 focus:outline-none disabled:opacity-50"
 						>
-							<option value="">Pilih kendaraan</option>
+							<option value="">{loadingVehicles ? "Memuat kendaraan..." : "Pilih kendaraan"}</option>
 
-							{vehicleOptions.map((vehicle) => (
+							{availableVehicleOptions.map((vehicle) => (
 								<option key={vehicle.id} value={vehicle.id}>
 									{vehicle.label}
 								</option>
 							))}
 						</select>
 
-						<p className="text-xs text-gray-400">Pilih kendaraan yang akan digunakan saat perjalanan nebeng barang.</p>
+						{!loadingVehicles && availableVehicleOptions.length === 0 ? (
+							<p className="text-xs font-bold text-amber-600">Kamu belum mendaftarkan kendaraan motor/mobil. Lengkapi dulu di halaman Status Akun sebelum bisa membuat tebengan barang.</p>
+						) : (
+							<p className="text-xs text-gray-400">Hanya menampilkan kendaraan yang sudah kamu daftarkan sebagai mitra.</p>
+						)}
 					</div>
 
 					{/* INPUT KAPASITAS BAGASI (Langsung Tampil) */}
@@ -286,7 +306,7 @@ export default function NebengBarang() {
 					{/* SUBMIT BUTTON */}
 					<button
 						onClick={handleNext}
-						disabled={!selectedOrigin || !selectedDestination || !date || !time || !baggageCapacity || !vehicleType || !!scheduleError}
+						disabled={!selectedOrigin || !selectedDestination || !date || !time || !baggageCapacity || !vehicleType || !!scheduleError || availableVehicleOptions.length === 0}
 						className="w-full bg-indigo-900 text-white py-5 rounded-[24px] font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-900"
 					>
 						Selanjutnya <ArrowRight size={24} />
