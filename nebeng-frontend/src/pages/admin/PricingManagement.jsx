@@ -206,8 +206,8 @@ export default function PricingManagement() {
 							<PriceInput label="Mobil (Tarif Awal)" name="barang_mobil_base_price" value={form.barang_mobil_base_price} onChange={handleChange} />
 							<PriceInput label="Mobil (Per KM)" name="barang_mobil_price_per_km" value={form.barang_mobil_price_per_km} onChange={handleChange} />
 
-							<PriceInput label="Bus (Tarif Awal)" name="barang_bus_base_price" value={form.barang_bus_base_price} onChange={handleChange} />
-							<PriceInput label="Bus (Per KM)" name="barang_bus_price_per_km" value={form.barang_bus_price_per_km} onChange={handleChange} />
+							<PriceInput label="Kendaraan Barang / Truk (Tarif Awal)" name="barang_bus_base_price" value={form.barang_bus_base_price} onChange={handleChange} />
+							<PriceInput label="Kendaraan Barang / Truk (Per KM)" name="barang_bus_price_per_km" value={form.barang_bus_price_per_km} onChange={handleChange} />
 
 							<PriceInput label="Kereta (Tarif Awal)" name="barang_kereta_base_price" value={form.barang_kereta_base_price} onChange={handleChange} />
 							<PriceInput label="Kereta (Per KM)" name="barang_kereta_price_per_km" value={form.barang_kereta_price_per_km} onChange={handleChange} />

@@ -15,6 +15,7 @@ import {
 	KeyRound,
 	QrCode,
 	Wallet,
+	Car,
 } from "lucide-react";
 
 export default function Profile() {
@@ -69,6 +70,14 @@ export default function Profile() {
 			color: "text-sky-500",
 			bg: "bg-sky-50",
 			path: "/mitra/status-akun",
+		},
+		{
+			id: 13,
+			label: "Kendaraan",
+			icon: Car,
+			color: "text-indigo-600",
+			bg: "bg-indigo-50",
+			path: "/mitra/kendaraan",
 		},
 		{
 			id: 9,

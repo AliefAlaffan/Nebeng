@@ -10,19 +10,19 @@ class UserProfile extends Model
     protected $fillable = [
         'user_id',
         'full_name',
+        'nik',
         'birth_place',
         'birth_date',
         'gender',
-
-        'nik',
         'religion',
         'address',
-
-        // BANK
+        'province',
+        'city',
+        'district',
+        'village',
         'bank_name',
         'bank_account_name',
         'bank_account_number',
-
         'qris_image',
     ];
 

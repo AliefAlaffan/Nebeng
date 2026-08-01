@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
-import { ChevronLeft, ChevronRight, ChevronDown, ShieldCheck, Mail, Phone, MapPin, FileText, Bike, Car, Package } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ShieldCheck, Mail, Phone, MapPin, FileText, Car } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 
@@ -40,39 +40,6 @@ export default function StatusAkun() {
 		fetchVerification();
 	}, []);
 
-	const [vehicles, setVehicles] = useState([]);
-	const [loadingVehicles, setLoadingVehicles] = useState(true);
-
-	// Ambil kendaraan yang sudah didaftarkan mitra (bukan dummy)
-	useEffect(() => {
-		const fetchVehicles = async () => {
-			try {
-				const token = localStorage.getItem("token");
-
-				const res = await fetch("http://127.0.0.1:8000/api/mitra/vehicles", {
-					headers: {
-						Authorization: `Bearer ${token}`,
-						Accept: "application/json",
-					},
-				});
-
-				if (res.ok) {
-					const data = await res.json();
-					setVehicles(data);
-				}
-			} catch (err) {
-				console.error("Gagal ambil data kendaraan:", err);
-			} finally {
-				setLoadingVehicles(false);
-			}
-		};
-
-		fetchVehicles();
-	}, []);
-
-	const vehicleTypeIcon = { motor: Bike, mobil: Car, barang: Package };
-	const vehicleTypeLabel = { motor: "Motor", mobil: "Mobil", barang: "Barang" };
-
 	// Data profil diambil dari akun mitra yang sedang login (bukan dummy)
 	const profileData = {
 		name: user?.name || "-",
@@ -107,10 +74,9 @@ export default function StatusAkun() {
 			: verification.notes || "Pengajuan verifikasi Anda ditolak, silakan ajukan ulang"
 		: "Anda belum pernah mengajukan verifikasi dokumen mitra";
 
-	// Status aktivitas akun: bagian "Status pendaftaran" sudah pakai data
-	// verifikasi asli. Bagian lain (tambah/hapus kendaraan, perubahan
-	// dokumen) belum ada pencatatan tersendiri di backend, jadi ditampilkan
-	// apa adanya sebagai "belum ada aktivitas" alih-alih data dummy.
+	// Catatan: pengelolaan kendaraan (tambah/lihat status persetujuan) sudah
+	// punya halaman tersendiri di menu Profil > "Kendaraan", jadi tidak lagi
+	// diduplikasi di sini.
 	const accountStatuses = [
 		{
 			id: "pendaftaran",
@@ -120,24 +86,6 @@ export default function StatusAkun() {
 			statusLabel: registrationStatusLabel,
 			item: "Dokumen driver",
 			hasData: !!verification,
-		},
-		{
-			id: "tambah_kendaraan",
-			label: "Status tambah kendaraan",
-			title: "Kendaraan Terdaftar",
-			desc: vehicles.length > 0 ? `Kamu memiliki ${vehicles.length} kendaraan terdaftar sebagai mitra.` : "Belum ada kendaraan yang didaftarkan.",
-			statusLabel: null,
-			item: null,
-			hasData: false,
-		},
-		{
-			id: "hapus_kendaraan",
-			label: "Status hapus kendaraan",
-			title: "Pengajuan Hapus Kendaraan",
-			desc: "Belum ada pengajuan hapus kendaraan.",
-			statusLabel: null,
-			item: null,
-			hasData: false,
 		},
 		{
 			id: "perubahan_dokumen",
@@ -196,41 +144,23 @@ export default function StatusAkun() {
 						)}
 					</div>
 
-					{/* KENDARAAN TERDAFTAR */}
-					<div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
-						<h3 className="text-sm font-black text-gray-800 mb-5">Kendaraan Terdaftar</h3>
+					{/* LINK KE HALAMAN KENDARAAN */}
+					<button
+						onClick={() => navigate("/mitra/kendaraan")}
+						className="w-full bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 flex items-center justify-between hover:border-indigo-200 transition-all group"
+					>
+						<div className="flex items-center gap-4">
+							<div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+								<Car size={22} />
+							</div>
+							<div className="text-left">
+								<p className="font-black text-gray-800 text-sm">Kendaraan Saya</p>
+								<p className="text-xs text-gray-400">Lihat & kelola kendaraan yang kamu daftarkan</p>
+							</div>
+						</div>
+						<ChevronRight size={18} className="text-gray-300 group-hover:translate-x-1 transition-transform" />
+					</button>
 
-						{loadingVehicles ? (
-							<p className="text-sm font-bold text-gray-400 text-center py-4">Memuat data kendaraan...</p>
-						) : vehicles.length > 0 ? (
-							<div className="space-y-3">
-								{vehicles.map((v) => {
-									const Icon = vehicleTypeIcon[v.type] || Car;
-									return (
-										<div key={v.id} className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-2xl p-4">
-											<div className="w-12 h-12 rounded-xl bg-indigo-900 text-white flex items-center justify-center shrink-0">
-												<Icon size={22} />
-											</div>
-											<div className="flex-1 min-w-0">
-												<p className="font-black text-gray-800 text-sm truncate">
-													{vehicleTypeLabel[v.type] || v.type} • {v.brand} {v.model}
-												</p>
-												<p className="text-xs text-gray-400 font-medium truncate">
-													{v.plate_number}
-													{v.color ? ` • ${v.color}` : ""}
-													{v.type === "mobil" && v.seat_capacity ? ` • Maks. ${v.seat_capacity} penumpang` : ""}
-												</p>
-											</div>
-										</div>
-									);
-								})}
-							</div>
-						) : (
-							<div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-6 text-center">
-								<p className="text-sm font-bold text-gray-400">Belum ada kendaraan terdaftar</p>
-							</div>
-						)}
-					</div>
 					<div className="space-y-3">
 						<h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-4 pl-2">Detail Aktivitas Akun</h3>
 

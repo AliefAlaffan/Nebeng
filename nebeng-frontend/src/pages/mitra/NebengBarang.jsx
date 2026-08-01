@@ -12,7 +12,7 @@ export default function NebengBarang() {
 	const [time, setTime] = useState("");
 	const [baggageCapacity, setBaggageCapacity] = useState("");
 	const [showBaggageModal, setShowBaggageModal] = useState(false);
-	const [vehicleType, setVehicleType] = useState("");
+	const [selectedVehicleId, setSelectedVehicleId] = useState("");
 
 	const [pickupPoints, setPickupPoints] = useState([]);
 	const [loadingPoints, setLoadingPoints] = useState(true);
@@ -29,14 +29,19 @@ export default function NebengBarang() {
 		{ id: "besar", label: "Besar - Maksimal 15 Kg" },
 	];
 
-	const vehicleOptions = [
-		{ id: "Barang-Motor", label: "Motor", regType: "motor" },
-		{ id: "Barang-Mobil", label: "Mobil", regType: "mobil" },
-	];
+	// type kendaraan (dari data kendaraan mitra) -> format vehicle_type yang
+	// dipakai sistem harga & tampilan (sudah dipakai luas di banyak tempat).
+	const typeToVehicleTypeString = {
+		motor: "Barang-Motor",
+		mobil: "Barang-Mobil",
+		barang: "Barang-Bus",
+	};
 
-	// Kendaraan yang benar-benar terdaftar mitra (dari halaman verifikasi /
-	// Status Akun) - jenis kendaraan yang bisa dipilih di sini dibatasi
-	// hanya yang sudah didaftarkan, bukan bebas pilih apapun.
+	const typeLabel = { motor: "Motor", mobil: "Mobil", barang: "Kendaraan Barang / Truk" };
+
+	// Kendaraan yang benar-benar terdaftar & disetujui admin - mitra pilih
+	// kendaraan SPESIFIK (merk, plat), bukan cuma kategori umum. Penting
+	// kalau mitra punya lebih dari 1 kendaraan.
 	const [myVehicles, setMyVehicles] = useState([]);
 	const [loadingVehicles, setLoadingVehicles] = useState(true);
 
@@ -66,8 +71,11 @@ export default function NebengBarang() {
 		fetchMyVehicles();
 	}, []);
 
-	const registeredTypes = new Set(myVehicles.map((v) => v.type));
-	const availableVehicleOptions = vehicleOptions.filter((opt) => registeredTypes.has(opt.regType));
+	const approvedVehicles = myVehicles.filter((v) => v.status === "approved");
+	const hasPendingVehicle = myVehicles.some((v) => v.status === "pending");
+
+	const selectedVehicle = approvedVehicles.find((v) => String(v.id) === String(selectedVehicleId)) || null;
+	const vehicleType = selectedVehicle ? typeToVehicleTypeString[selectedVehicle.type] : "";
 
 	const filteredBaggageOptions = baggageOptions.filter((option) => {
 		if (vehicleType === "Barang-Motor") {
@@ -76,6 +84,11 @@ export default function NebengBarang() {
 
 		if (vehicleType === "Barang-Mobil") {
 			return ["xxs", "xs", "kecil", "sedang", "besar"].includes(option.id);
+		}
+
+		if (vehicleType === "Barang-Bus") {
+			// kendaraan barang (truk, pickup box, dll) - kapasitas paling besar
+			return true;
 		}
 
 		return true;
@@ -113,8 +126,8 @@ export default function NebengBarang() {
 
 	// ================= LOGIKA =================
 	const handleNext = () => {
-		if (!selectedOrigin || !selectedDestination || !date || !time || !baggageCapacity || !vehicleType) {
-			alert("Mohon lengkapi semua data pengiriman barang");
+		if (!selectedOrigin || !selectedDestination || !date || !time || !baggageCapacity || !selectedVehicle) {
+			alert("Mohon lengkapi semua data pengiriman barang, termasuk kendaraan yang dipakai");
 			return;
 		}
 
@@ -123,11 +136,6 @@ export default function NebengBarang() {
 			alert(scheduleCheck.message);
 			return;
 		}
-
-		console.log({
-			baggageCapacity,
-			vehicleType,
-		});
 
 		const tripData = {
 			origin_point_id: selectedOrigin.id,
@@ -149,6 +157,11 @@ export default function NebengBarang() {
 			baggage_capacity: baggageCapacity,
 
 			vehicle_type: vehicleType,
+			mitra_vehicle_id: selectedVehicle.id,
+			vehicle_plate: selectedVehicle.plate_number,
+			vehicle_brand: selectedVehicle.brand,
+			vehicle_model: selectedVehicle.model,
+			vehicle_color: selectedVehicle.color,
 			// price: 20000, // sementara
 		};
 
@@ -258,32 +271,34 @@ export default function NebengBarang() {
 						<p className="text-xs font-bold text-red-500 -mt-2 px-2">{scheduleError}</p>
 					)}
 
-					{/* PILIH JENIS KENDARAAN */}
+					{/* PILIH KENDARAAN SPESIFIK */}
 					<div className="bg-white p-6 rounded-3xl border border-gray-100 space-y-3">
-						<label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">JENIS KENDARAAN</label>
+						<label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">PILIH KENDARAAN</label>
 
 						<select
-							value={vehicleType}
+							value={selectedVehicleId}
 							onChange={(e) => {
-								setVehicleType(e.target.value);
+								setSelectedVehicleId(e.target.value);
 								setBaggageCapacity("");
 							}}
-							disabled={loadingVehicles || availableVehicleOptions.length === 0}
+							disabled={loadingVehicles || approvedVehicles.length === 0}
 							className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-indigo-900 focus:outline-none disabled:opacity-50"
 						>
-							<option value="">{loadingVehicles ? "Memuat kendaraan..." : "Pilih kendaraan"}</option>
+							<option value="">{loadingVehicles ? "Memuat kendaraan..." : "Pilih kendaraan yang dipakai"}</option>
 
-							{availableVehicleOptions.map((vehicle) => (
-								<option key={vehicle.id} value={vehicle.id}>
-									{vehicle.label}
+							{approvedVehicles.map((v) => (
+								<option key={v.id} value={v.id}>
+									{typeLabel[v.type]} • {v.brand} {v.model} • {v.plate_number} {v.color ? `• ${v.color}` : ""}
 								</option>
 							))}
 						</select>
 
-						{!loadingVehicles && availableVehicleOptions.length === 0 ? (
-							<p className="text-xs font-bold text-amber-600">Kamu belum mendaftarkan kendaraan motor/mobil. Lengkapi dulu di halaman Status Akun sebelum bisa membuat tebengan barang.</p>
+						{!loadingVehicles && approvedVehicles.length === 0 ? (
+							<p className="text-xs font-bold text-amber-600">
+								{hasPendingVehicle ? "Kendaraan kamu masih menunggu persetujuan admin. Cek statusnya di menu Profil > Kendaraan." : "Kamu belum mendaftarkan kendaraan. Lengkapi dulu di menu Profil > Kendaraan."}
+							</p>
 						) : (
-							<p className="text-xs text-gray-400">Hanya menampilkan kendaraan yang sudah kamu daftarkan sebagai mitra.</p>
+							<p className="text-xs text-gray-400">Hanya menampilkan kendaraan yang sudah disetujui admin.</p>
 						)}
 					</div>
 
@@ -306,7 +321,7 @@ export default function NebengBarang() {
 					{/* SUBMIT BUTTON */}
 					<button
 						onClick={handleNext}
-						disabled={!selectedOrigin || !selectedDestination || !date || !time || !baggageCapacity || !vehicleType || !!scheduleError || availableVehicleOptions.length === 0}
+						disabled={!selectedOrigin || !selectedDestination || !date || !time || !baggageCapacity || !selectedVehicle || !!scheduleError}
 						className="w-full bg-indigo-900 text-white py-5 rounded-[24px] font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-900"
 					>
 						Selanjutnya <ArrowRight size={24} />

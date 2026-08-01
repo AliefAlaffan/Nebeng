@@ -30,7 +30,6 @@ const ProfileAdmin = lazy(() => import("../pages/admin/Profile"));
 const EditProfileAdmin = lazy(() => import("../pages/admin/EditProfile"));
 const AturPasswordAdmin = lazy(() => import("../pages/customer/AturPassword"));
 const AturHarga = lazy(() => import("../pages/admin/PricingManagement"));
-const PickupPointManagement = lazy(() => import("../pages/admin/PickupPointManagement"));
 
 /* CUSTOMER */
 const DashboardCustomer = lazy(() => import("../pages/customer/Dashboard"));
@@ -73,6 +72,7 @@ const MitraProfile = lazy(() => import("../pages/mitra/Profile"));
 const QrisSaya = lazy(() => import("../pages/mitra/QrisSaya"));
 const MitraRiwayat = lazy(() => import("../pages/mitra/Riwayat"));
 const StatusAkun = lazy(() => import("../pages/mitra/StatusAkun"));
+const KendaraanSaya = lazy(() => import("../pages/mitra/KendaraanSaya"));
 const KeamananMitra = lazy(() => import("../pages/mitra/Keamanan"));
 const PusatBantuanMitra = lazy(() => import("../pages/mitra/PusatBantuan"));
 const Dokumen = lazy(() => import("../pages/mitra/Dokumen"));
@@ -172,15 +172,6 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="admin">
 						<AturHarga />
-					</ProtectedRoute>
-				}
-			/>
-
-			<Route
-				path="/admin/pengaturan/pickup-point"
-				element={
-					<ProtectedRoute role="admin">
-						<PickupPointManagement />
 					</ProtectedRoute>
 				}
 			/>
@@ -762,6 +753,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="mitra">
 						<StatusAkun />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/mitra/kendaraan"
+				element={
+					<ProtectedRoute role="mitra">
+						<KendaraanSaya />
 					</ProtectedRoute>
 				}
 			/>

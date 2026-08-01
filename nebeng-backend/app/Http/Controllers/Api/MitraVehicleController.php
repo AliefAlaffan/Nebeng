@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MitraVehicle;
+use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class MitraVehicleController extends Controller
 {
     /**
-     * Mitra menambahkan data kendaraan (dipanggil saat proses verifikasi,
-     * atau kapan saja setelah itu lewat halaman "Status Akun" / "Tambah Kendaraan").
+     * Mitra menambahkan data kendaraan (dipanggil saat proses verifikasi
+     * akun awal, atau kapan saja setelah itu lewat halaman "Kendaraan" di
+     * Profil). Kendaraan baru SELALU berstatus "pending" dan baru bisa
+     * dipakai untuk membuat tebengan setelah disetujui admin.
      */
     public function store(Request $request)
     {
@@ -43,17 +47,34 @@ class MitraVehicleController extends Controller
         $vehicle = MitraVehicle::create([
             ...$validated,
             'user_id' => $user->id,
+            'status' => 'pending',
         ]);
 
+        // Notifikasi ke semua admin supaya kendaraan baru ini ditinjau
+        try {
+            $adminIds = User::where('role', 'admin')->pluck('id')->toArray();
+
+            NotificationService::sendToMany(
+                $adminIds,
+                'Kendaraan Baru Menunggu Persetujuan',
+                "{$user->name} menambahkan kendaraan {$vehicle->brand} ({$vehicle->type}) yang perlu ditinjau.",
+                'vehicle',
+                '/admin/kendaraan-mitra'
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal kirim notifikasi kendaraan baru: ' . $e->getMessage());
+        }
+
         return response()->json([
-            'message' => 'Kendaraan berhasil ditambahkan',
+            'message' => 'Kendaraan berhasil ditambahkan dan menunggu persetujuan admin',
             'vehicle' => $vehicle,
         ], 201);
     }
 
     /**
      * Daftar kendaraan milik mitra yang sedang login (buat halaman
-     * Status Akun / profil mitra).
+     * "Kendaraan" di Profil mitra) - termasuk yang masih pending/ditolak,
+     * supaya mitra bisa lihat status pengajuannya.
      */
     public function myVehicles(Request $request)
     {
@@ -67,12 +88,14 @@ class MitraVehicleController extends Controller
     /**
      * Kapasitas maksimal kursi mobil mitra (dipakai NebengMobil.jsx saat
      * membuat tebengan supaya jumlah penumpang tidak melebihi kapasitas
-     * kendaraan asli yang terdaftar).
+     * kendaraan asli yang terdaftar). Hanya menghitung kendaraan yang
+     * SUDAH disetujui admin.
      */
     public function myCarCapacity(Request $request)
     {
         $vehicle = MitraVehicle::where('user_id', $request->user()->id)
             ->where('type', 'mobil')
+            ->where('status', 'approved')
             ->orderByDesc('created_at')
             ->first();
 
@@ -98,10 +121,15 @@ class MitraVehicleController extends Controller
             'seat_capacity' => 'nullable|integer|min:1|max:20',
         ]);
 
+        // Kendaraan yang diedit mitra sendiri harus ditinjau ulang oleh
+        // admin (supaya tidak bisa asal ganti data setelah disetujui).
+        $validated['status'] = 'pending';
+        $validated['notes'] = null;
+
         $vehicle->update($validated);
 
         return response()->json([
-            'message' => 'Kendaraan berhasil diperbarui',
+            'message' => 'Kendaraan berhasil diperbarui dan menunggu persetujuan ulang admin',
             'vehicle' => $vehicle,
         ]);
     }
@@ -133,6 +161,10 @@ class MitraVehicleController extends Controller
             });
         }
 
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
+        }
+
         $vehicles = $query->orderByDesc('created_at')->paginate(10);
 
         return response()->json($vehicles);
@@ -145,23 +177,67 @@ class MitraVehicleController extends Controller
         return response()->json($vehicle);
     }
 
-    public function adminUpdate(Request $request, $id)
+    /**
+     * Admin menyetujui kendaraan -> baru bisa dipakai mitra untuk
+     * membuat tebengan setelah ini.
+     */
+    public function approve($id)
     {
-        $vehicle = MitraVehicle::findOrFail($id);
+        $vehicle = MitraVehicle::with('user')->findOrFail($id);
 
-        $validated = $request->validate([
-            'type' => 'sometimes|in:motor,mobil,barang',
-            'brand' => 'sometimes|string|max:100',
-            'model' => 'nullable|string|max:100',
-            'plate_number' => 'sometimes|string|max:20',
-            'color' => 'nullable|string|max:50',
-            'seat_capacity' => 'nullable|integer|min:1|max:20',
+        $vehicle->update([
+            'status' => 'approved',
+            'notes' => null,
         ]);
 
-        $vehicle->update($validated);
+        try {
+            NotificationService::send(
+                $vehicle->user_id,
+                'Kendaraan Disetujui',
+                "Kendaraan {$vehicle->brand} {$vehicle->model} ({$vehicle->plate_number}) kamu sudah disetujui dan bisa dipakai membuat tebengan.",
+                'vehicle',
+                '/mitra/kendaraan'
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal kirim notifikasi persetujuan kendaraan: ' . $e->getMessage());
+        }
 
         return response()->json([
-            'message' => 'Kendaraan berhasil diperbarui',
+            'message' => 'Kendaraan berhasil disetujui',
+            'vehicle' => $vehicle,
+        ]);
+    }
+
+    /**
+     * Admin menolak kendaraan, dengan alasan opsional.
+     */
+    public function reject(Request $request, $id)
+    {
+        $vehicle = MitraVehicle::with('user')->findOrFail($id);
+
+        $validated = $request->validate([
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $vehicle->update([
+            'status' => 'rejected',
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        try {
+            NotificationService::send(
+                $vehicle->user_id,
+                'Kendaraan Ditolak',
+                "Kendaraan {$vehicle->brand} {$vehicle->model} ({$vehicle->plate_number}) kamu ditolak." . (!empty($validated['notes']) ? " Alasan: {$validated['notes']}" : ''),
+                'vehicle',
+                '/mitra/kendaraan'
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal kirim notifikasi penolakan kendaraan: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'message' => 'Kendaraan ditolak',
             'vehicle' => $vehicle,
         ]);
     }

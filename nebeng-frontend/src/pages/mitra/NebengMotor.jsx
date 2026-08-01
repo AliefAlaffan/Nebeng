@@ -24,6 +24,46 @@ export default function TambahNebeng() {
 	const [showTypeModal, setShowTypeModal] = useState(false);
 	const [showBaggageModal, setShowBaggageModal] = useState(false);
 
+	// Daftar motor mitra yang sudah disetujui admin - mitra pilih salah satu
+	// kendaraan spesifik, penting kalau mitra punya lebih dari 1 motor.
+	const [myMotors, setMyMotors] = useState([]);
+	const [selectedVehicleId, setSelectedVehicleId] = useState("");
+	const [loadingVehicles, setLoadingVehicles] = useState(true);
+
+	const selectedVehicle = myMotors.find((v) => String(v.id) === String(selectedVehicleId)) || null;
+
+	useEffect(() => {
+		const fetchMyMotors = async () => {
+			try {
+				const token = localStorage.getItem("token");
+
+				const res = await fetch("http://127.0.0.1:8000/api/mitra/vehicles", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+					},
+				});
+
+				if (res.ok) {
+					const data = await res.json();
+					const approvedMotors = data.filter((v) => v.type === "motor" && v.status === "approved");
+
+					setMyMotors(approvedMotors);
+
+					if (approvedMotors.length === 1) {
+						setSelectedVehicleId(String(approvedMotors[0].id));
+					}
+				}
+			} catch (err) {
+				console.error("Gagal ambil daftar kendaraan:", err);
+			} finally {
+				setLoadingVehicles(false);
+			}
+		};
+
+		fetchMyMotors();
+	}, []);
+
 	// ================= DATA OPTIONS =================
 	const typeOptions = [
 		{ id: "penumpang", label: "Hanya Tebengan", desc: "Anda hanya menerima penumpang", icon: Users },
@@ -79,6 +119,11 @@ export default function TambahNebeng() {
 			return;
 		}
 
+		if (!selectedVehicle) {
+			alert("Mohon pilih motor yang akan digunakan untuk tebengan ini.");
+			return;
+		}
+
 		const check = validateDepartureSchedule(date, time);
 		if (!check.valid) {
 			alert(check.message);
@@ -104,6 +149,11 @@ export default function TambahNebeng() {
 			tebengan_type: tebenganType,
 			baggage_capacity: baggageCapacity,
 			vehicle_type: "motor",
+			mitra_vehicle_id: selectedVehicle.id,
+			vehicle_plate: selectedVehicle.plate_number,
+			vehicle_brand: selectedVehicle.brand,
+			vehicle_model: selectedVehicle.model,
+			vehicle_color: selectedVehicle.color,
 			// price: 25000, //sementara
 		};
 
@@ -127,7 +177,7 @@ export default function TambahNebeng() {
 		fetchPickupPoints();
 	}, []);
 
-	const isNextDisabled = !selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount || !!scheduleError;
+	const isNextDisabled = !selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount || !selectedVehicle || !!scheduleError;
 
 	return (
 		<MitraLayout>
@@ -228,6 +278,30 @@ export default function TambahNebeng() {
 						</div>
 						<ChevronDown className="text-gray-300 transition-transform group-hover:translate-y-0.5" />
 					</button>
+
+					{/* PILIH KENDARAAN SPESIFIK */}
+					<div className="bg-white p-6 rounded-3xl border border-gray-100 space-y-3">
+						<label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">PILIH MOTOR</label>
+
+						<select
+							value={selectedVehicleId}
+							onChange={(e) => setSelectedVehicleId(e.target.value)}
+							disabled={loadingVehicles || myMotors.length === 0}
+							className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-indigo-900 focus:outline-none disabled:opacity-50"
+						>
+							<option value="">{loadingVehicles ? "Memuat kendaraan..." : "Pilih motor yang dipakai"}</option>
+
+							{myMotors.map((v) => (
+								<option key={v.id} value={v.id}>
+									{v.brand} {v.model} • {v.plate_number} {v.color ? `• ${v.color}` : ""}
+								</option>
+							))}
+						</select>
+
+						{!loadingVehicles && myMotors.length === 0 && (
+							<p className="text-xs font-bold text-amber-600">Kamu belum punya motor yang disetujui admin. Tambahkan di menu Profil &gt; Kendaraan.</p>
+						)}
+					</div>
 
 					{/* DYNAMIC FORM FIELDS */}
 					{tebenganType && (

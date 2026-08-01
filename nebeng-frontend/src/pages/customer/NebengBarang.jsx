@@ -69,22 +69,7 @@ export default function NebengBarang() {
 		}
 
 		if (vehicleType === "Barang-Bus") {
-			return ["xxs", "xs", "kecil", "sedang", "besar"].includes(option.id);
-		}
-
-		if (vehicleType === "Barang-Pesawat") {
-			return ["xxs", "xs", "kecil"].includes(option.id);
-		}
-
-		if (vehicleType === "Barang-Kereta") {
-			return ["xxs", "xs", "kecil", "sedang"].includes(option.id);
-		}
-
-		if (vehicleType === "Barang-Kapal") {
-			return true;
-		}
-
-		if (vehicleType === "all") {
+			// kendaraan barang (truk, dll) - kapasitas paling besar
 			return true;
 		}
 
@@ -363,13 +348,7 @@ export default function NebengBarang() {
 
 										<option value="Barang-Mobil">Mobil</option>
 
-										<option value="Barang-Bus">Bus</option>
-
-										<option value="Barang-Kapal">Kapal</option>
-
-										<option value="Barang-Pesawat">Pesawat</option>
-
-										<option value="Barang-Kereta">Kereta</option>
+										<option value="Barang-Bus">Kendaraan Barang (Truk, dll)</option>
 									</select>
 								</div>
 

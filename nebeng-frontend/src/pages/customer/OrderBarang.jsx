@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Link, useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, ArrowRight, Navigation, Clock, Users, Filter, Search, CheckCircle2, Bike, Car, Plane, Ship, Train, Package, Bus } from "lucide-react";
+import { ChevronLeft, ArrowRight, Navigation, Clock, Users, Filter, Search, CheckCircle2, Bike, Car, Plane, Ship, Train, Package, Truck } from "lucide-react";
 
 export default function OrderBarang() {
 	const [searchParams] = useSearchParams();
@@ -290,7 +290,7 @@ export default function OrderBarang() {
 				return <Train size={16} />;
 
 			case "Barang-Bus":
-				return <Bus size={16} />;
+				return <Truck size={16} />;
 
 			default:
 				return <Package size={16} />;

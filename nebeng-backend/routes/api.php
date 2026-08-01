@@ -204,7 +204,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // KENDARAAN MITRA (admin)
     Route::get('/admin/kendaraan-mitra', [MitraVehicleController::class, 'adminIndex']);
     Route::get('/admin/kendaraan-mitra/{id}', [MitraVehicleController::class, 'adminShow']);
-    Route::put('/admin/kendaraan-mitra/{id}', [MitraVehicleController::class, 'adminUpdate']);
+    Route::post('/admin/kendaraan-mitra/{id}/approve', [MitraVehicleController::class, 'approve']);
+    Route::post('/admin/kendaraan-mitra/{id}/reject', [MitraVehicleController::class, 'reject']);
 });
 
 // KENDARAAN MITRA (mitra sendiri)

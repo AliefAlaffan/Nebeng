@@ -11,6 +11,7 @@ class Trip extends Model
     protected $fillable = [
 
         'mitra_id',
+        'mitra_vehicle_id',
 
         'vehicle_type',
 
@@ -42,6 +43,11 @@ class Trip extends Model
     public function mitra()
     {
         return $this->belongsTo(User::class, 'mitra_id');
+    }
+
+    public function mitraVehicle()
+    {
+        return $this->belongsTo(MitraVehicle::class, 'mitra_vehicle_id');
     }
 
     public function originPoint()

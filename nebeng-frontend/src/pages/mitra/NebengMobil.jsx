@@ -19,17 +19,22 @@ export default function TambahNebeng() {
 	const [showTypeModal, setShowTypeModal] = useState(false);
 	const [showBaggageModal, setShowBaggageModal] = useState(false);
 
-	// Kapasitas maksimal penumpang sesuai kendaraan mobil yang terdaftar
-	// saat verifikasi mitra (bukan lagi bebas diisi manual).
-	const [carCapacity, setCarCapacity] = useState(null); // null = belum dicek / belum ada kendaraan terdaftar
+	// Daftar mobil mitra yang sudah disetujui admin - mitra pilih salah satu
+	// kendaraan spesifik (bukan cuma kapasitas generik), penting kalau
+	// mitra punya lebih dari 1 mobil.
+	const [myCars, setMyCars] = useState([]);
+	const [selectedVehicleId, setSelectedVehicleId] = useState("");
 	const [loadingCapacity, setLoadingCapacity] = useState(true);
 
+	const selectedVehicle = myCars.find((v) => String(v.id) === String(selectedVehicleId)) || null;
+	const carCapacity = selectedVehicle?.seat_capacity || null;
+
 	useEffect(() => {
-		const fetchCarCapacity = async () => {
+		const fetchMyCars = async () => {
 			try {
 				const token = localStorage.getItem("token");
 
-				const res = await fetch("http://127.0.0.1:8000/api/mitra/vehicles/car-capacity", {
+				const res = await fetch("http://127.0.0.1:8000/api/mitra/vehicles", {
 					headers: {
 						Authorization: `Bearer ${token}`,
 						Accept: "application/json",
@@ -38,21 +43,35 @@ export default function TambahNebeng() {
 
 				if (res.ok) {
 					const data = await res.json();
+					const approvedCars = data.filter((v) => v.type === "mobil" && v.status === "approved");
 
-					if (data.has_vehicle && data.seat_capacity) {
-						setCarCapacity(data.seat_capacity);
-						setSeatCount(String(data.seat_capacity));
+					setMyCars(approvedCars);
+
+					// auto-pilih kalau cuma ada 1 mobil, biar tidak ribet
+					if (approvedCars.length === 1) {
+						setSelectedVehicleId(String(approvedCars[0].id));
+						setSeatCount(String(approvedCars[0].seat_capacity));
 					}
 				}
 			} catch (err) {
-				console.error("Gagal ambil kapasitas mobil:", err);
+				console.error("Gagal ambil daftar kendaraan:", err);
 			} finally {
 				setLoadingCapacity(false);
 			}
 		};
 
-		fetchCarCapacity();
+		fetchMyCars();
 	}, []);
+
+	const handleVehicleSelect = (e) => {
+		const id = e.target.value;
+		setSelectedVehicleId(id);
+
+		const vehicle = myCars.find((v) => String(v.id) === id);
+		if (vehicle) {
+			setSeatCount(String(vehicle.seat_capacity));
+		}
+	};
 
 	const typeOptions = [
 		{ id: "penumpang", label: "Hanya Tebengan", desc: "Anda hanya menerima penumpang", icon: Users },
@@ -94,6 +113,11 @@ export default function TambahNebeng() {
 			return;
 		}
 
+		if (!selectedVehicle) {
+			alert("Mohon pilih mobil yang akan digunakan untuk tebengan ini.");
+			return;
+		}
+
 		if (carCapacity && parseInt(seatCount) > carCapacity) {
 			alert(`Jumlah kursi tidak boleh melebihi kapasitas kendaraan terdaftar (maks. ${carCapacity} penumpang).`);
 			return;
@@ -124,6 +148,11 @@ export default function TambahNebeng() {
 			tebengan_type: tebenganType,
 			baggage_capacity: baggageCapacity,
 			vehicle_type: "mobil",
+			mitra_vehicle_id: selectedVehicle.id,
+			vehicle_plate: selectedVehicle.plate_number,
+			vehicle_brand: selectedVehicle.brand,
+			vehicle_model: selectedVehicle.model,
+			vehicle_color: selectedVehicle.color,
 			// price: 50000, //sementara
 		};
 
@@ -242,18 +271,43 @@ export default function TambahNebeng() {
 						<ChevronDown className="text-gray-300 transition-transform group-hover:translate-y-0.5" />
 					</button>
 
+					{/* PILIH KENDARAAN SPESIFIK */}
+					<div className="bg-white p-6 rounded-3xl border border-gray-100 space-y-3">
+						<label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">PILIH MOBIL</label>
+
+						<select
+							value={selectedVehicleId}
+							onChange={handleVehicleSelect}
+							disabled={loadingCapacity || myCars.length === 0}
+							className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-indigo-900 focus:outline-none disabled:opacity-50"
+						>
+							<option value="">{loadingCapacity ? "Memuat kendaraan..." : "Pilih mobil yang dipakai"}</option>
+
+							{myCars.map((v) => (
+								<option key={v.id} value={v.id}>
+									{v.brand} {v.model} • {v.plate_number} {v.color ? `• ${v.color}` : ""} (Maks. {v.seat_capacity} penumpang)
+								</option>
+							))}
+						</select>
+
+						{!loadingCapacity && myCars.length === 0 && (
+							<p className="text-xs font-bold text-amber-600">Kamu belum punya mobil yang disetujui admin. Tambahkan di menu Profil &gt; Kendaraan.</p>
+						)}
+					</div>
+
 					{tebenganType && (
 						<div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
 							<div className="bg-white p-6 rounded-3xl border border-gray-100 flex items-center gap-4">
 								<div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Users size={24} /></div>
 								<div className="flex-1">
-									<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">JUMLAH KURSI TERSEDIA</p>
+									<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">JUMLAH KURSI DITAWARKAN</p>
 									<input
 										type="number"
 										placeholder="Contoh: 1"
 										min={1}
 										max={carCapacity || undefined}
 										value={seatCount}
+										disabled={!selectedVehicle}
 										onChange={(e) => {
 											const val = e.target.value;
 											if (carCapacity && Number(val) > carCapacity) {
@@ -262,14 +316,12 @@ export default function TambahNebeng() {
 											}
 											setSeatCount(val);
 										}}
-										className="bg-transparent font-black text-indigo-900 outline-none w-full text-lg"
+										className="bg-transparent font-black text-indigo-900 outline-none w-full text-lg disabled:opacity-50"
 									/>
-									{loadingCapacity ? (
-										<p className="text-[10px] text-gray-400 mt-1">Memuat kapasitas kendaraan...</p>
-									) : carCapacity ? (
-										<p className="text-[10px] text-indigo-500 font-bold mt-1">Maks. {carCapacity} penumpang sesuai kendaraan terdaftar</p>
+									{!selectedVehicle ? (
+										<p className="text-[10px] text-gray-400 mt-1">Pilih mobil dulu di atas untuk menentukan kapasitas.</p>
 									) : (
-										<p className="text-[10px] text-amber-500 font-bold mt-1">Kamu belum mendaftarkan kendaraan mobil. Lengkapi di halaman Status Akun.</p>
+										<p className="text-[10px] text-indigo-500 font-bold mt-1">Maks. {carCapacity} penumpang sesuai kendaraan yang dipilih</p>
 									)}
 								</div>
 							</div>
@@ -289,7 +341,7 @@ export default function TambahNebeng() {
 						</div>
 					)}
 
-					<button onClick={handleNext} disabled={!selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount || !!scheduleError} className="w-full bg-indigo-900 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-900">
+					<button onClick={handleNext} disabled={!selectedOrigin || !selectedDestination || !date || !time || !tebenganType || !seatCount || !selectedVehicle || !!scheduleError} className="w-full bg-indigo-900 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-900">
 						Selanjutnya <ArrowRight size={24} />
 					</button>
 				</div>

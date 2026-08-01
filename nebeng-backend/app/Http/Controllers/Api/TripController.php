@@ -97,17 +97,38 @@ class TripController extends Controller
                 // 🔥 BARU
                 'max_cap' =>
                     'nullable|integer|min:1',
+
+                // Kendaraan spesifik (merk/plat) yang dipakai untuk trip ini
+                'mitra_vehicle_id' => 'nullable|exists:mitra_vehicles,id',
             ]);
 
             // ====================================
-            // VALIDASI KAPASITAS SESUAI KENDARAAN TERDAFTAR
+            // VALIDASI KENDARAAN SPESIFIK YANG DIPILIH
             // ====================================
-            $vehicle = $request->user()->vehicle;
+            $mitraVehicle = null;
 
-            if ($vehicle && $request->seat_total > $vehicle->seat_capacity) {
-                return response()->json([
-                    'message' => "Jumlah kursi tidak boleh melebihi kapasitas kendaraan terdaftar ({$vehicle->seat_capacity} penumpang)."
-                ], 422);
+            if ($request->filled('mitra_vehicle_id')) {
+                $mitraVehicle = \App\Models\MitraVehicle::where('id', $request->mitra_vehicle_id)
+                    ->where('user_id', auth()->id())
+                    ->first();
+
+                if (!$mitraVehicle) {
+                    return response()->json([
+                        'message' => 'Kendaraan yang dipilih tidak ditemukan.',
+                    ], 422);
+                }
+
+                if ($mitraVehicle->status !== 'approved') {
+                    return response()->json([
+                        'message' => 'Kendaraan yang dipilih belum disetujui admin.',
+                    ], 422);
+                }
+
+                if ($mitraVehicle->type === 'mobil' && $mitraVehicle->seat_capacity && $request->seat_total > $mitraVehicle->seat_capacity) {
+                    return response()->json([
+                        'message' => "Jumlah kursi tidak boleh melebihi kapasitas kendaraan terdaftar ({$mitraVehicle->seat_capacity} penumpang).",
+                    ], 422);
+                }
             }
 
             // ====================================
@@ -217,6 +238,8 @@ if ($request->tebengan_type === "Barang") {
 
         'mitra_id' => auth()->id(),
 
+        'mitra_vehicle_id' => $mitraVehicle->id ?? null,
+
         'vehicle_type' =>
             $request->vehicle_type,
 
@@ -274,6 +297,8 @@ if ($request->tebengan_type === "Barang") {
     $tripPassenger = Trip::create([
 
         'mitra_id' => auth()->id(),
+
+        'mitra_vehicle_id' => $mitraVehicle->id ?? null,
 
         'vehicle_type' =>
             $request->vehicle_type,
@@ -339,6 +364,8 @@ if ($request->tebengan_type === "Barang") {
                 Trip::create([
 
                     'mitra_id' => auth()->id(),
+
+                    'mitra_vehicle_id' => $mitraVehicle->id ?? null,
 
                     'vehicle_type' => $goodsVehicleType,
 

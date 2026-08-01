@@ -15,6 +15,8 @@ class MitraVehicle extends Model
         'color',
         'seat_capacity',
         'photo',
+        'status',
+        'notes',
     ];
 
     public function user()

@@ -66,7 +66,7 @@ export default function Dashboard() {
 
 		"Barang-Motor": "Barang Motor",
 		"Barang-Mobil": "Barang Mobil",
-		"Barang-Bus": "Barang Bus",
+		"Barang-Bus": "Kendaraan Barang (Truk)",
 		"Barang-Kereta": "Barang Kereta",
 		"Barang-Kapal": "Barang Kapal",
 		"Barang-Pesawat": "Barang Pesawat",
