@@ -115,6 +115,7 @@ Route::middleware('auth:sanctum')->get('/reward-points', function (Request $requ
     ]);
 });
 
+Route::middleware('auth:sanctum')->get('/rewards', [RewardController::class, 'index']);
 Route::middleware('auth:sanctum')->post('/reward/redeem', [RewardController::class, 'redeem']);
 
 Route::middleware('auth:sanctum')->get('/reward-history', function (Request $request) {
