@@ -12,7 +12,7 @@ const emptyForm = {
 	points_required: "",
 	stock: "",
 	unlimitedStock: false,
-	category: "merchandise",
+	category: "merchandise", // Cuma "merchandise" untuk sekarang, voucher potongan harga tidak dipakai
 	is_active: true,
 	image: null, // File baru (kalau upload ulang)
 	currentImage: null, // URL foto yang sudah ada
@@ -76,7 +76,7 @@ export default function KelolaReward() {
 			points_required: reward.points_required,
 			stock: reward.stock ?? "",
 			unlimitedStock: reward.stock === null,
-			category: reward.category,
+			category: "merchandise",
 			is_active: reward.is_active,
 			image: null,
 			currentImage: reward.image,
@@ -87,8 +87,8 @@ export default function KelolaReward() {
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 
-		if (!form.title || !form.points_required || !form.category) {
-			toast.error("Judul, poin, dan kategori wajib diisi");
+		if (!form.title || !form.points_required) {
+			toast.error("Judul dan poin wajib diisi");
 			return;
 		}
 
@@ -100,7 +100,7 @@ export default function KelolaReward() {
 			formData.append("description", form.description || "");
 			formData.append("points_required", form.points_required);
 			formData.append("stock", form.unlimitedStock ? "" : form.stock);
-			formData.append("category", form.category);
+			formData.append("category", "merchandise");
 			formData.append("is_active", form.is_active ? "1" : "0");
 
 			if (form.image) {
@@ -185,7 +185,7 @@ export default function KelolaReward() {
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
 					<div>
 						<h1 className="text-2xl font-black text-indigo-900">Kelola Reward</h1>
-						<p className="text-sm text-gray-400">Katalog hadiah/voucher yang bisa ditukar customer dengan poin</p>
+						<p className="text-sm text-gray-400">Katalog merchandise yang bisa ditukar customer dengan poin</p>
 					</div>
 					<button onClick={openAddModal} className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-900 text-white rounded-2xl font-black text-sm shadow-lg hover:bg-indigo-800 active:scale-95 transition-all">
 						<Plus size={18} /> Tambah Reward
@@ -222,7 +222,6 @@ export default function KelolaReward() {
 									<tr className="border-b border-gray-100 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
 										<th className="px-6 py-4">Foto</th>
 										<th className="px-6 py-4">Judul</th>
-										<th className="px-6 py-4">Kategori</th>
 										<th className="px-6 py-4 text-center">Poin</th>
 										<th className="px-6 py-4 text-center">Stok</th>
 										<th className="px-6 py-4 text-center">Status</th>
@@ -238,7 +237,6 @@ export default function KelolaReward() {
 												</div>
 											</td>
 											<td className="px-6 py-4 font-bold text-gray-700 max-w-[220px]">{r.title}</td>
-											<td className="px-6 py-4 text-gray-500 capitalize">{r.category}</td>
 											<td className="px-6 py-4 text-center font-bold text-indigo-600">{r.points_required}</td>
 											<td className="px-6 py-4 text-center text-gray-500">{r.stock === null ? "∞" : r.stock}</td>
 											<td className="px-6 py-4 text-center">
@@ -332,30 +330,16 @@ export default function KelolaReward() {
 								/>
 							</div>
 
-							<div className="grid grid-cols-2 gap-4">
-								<div>
-									<label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Poin Dibutuhkan</label>
-									<input
-										type="number"
-										min="1"
-										value={form.points_required}
-										onChange={(e) => setForm({ ...form, points_required: e.target.value })}
-										placeholder="150"
-										className="w-full mt-1 px-4 py-3 border-2 border-gray-100 bg-gray-50/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-600 focus:bg-white transition-all"
-									/>
-								</div>
-
-								<div>
-									<label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Kategori</label>
-									<select
-										value={form.category}
-										onChange={(e) => setForm({ ...form, category: e.target.value })}
-										className="w-full mt-1 px-4 py-3 border-2 border-gray-100 bg-gray-50/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-600 focus:bg-white transition-all"
-									>
-										<option value="merchandise">Merchandise</option>
-										<option value="voucher">Voucher</option>
-									</select>
-								</div>
+							<div>
+								<label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Poin Dibutuhkan</label>
+								<input
+									type="number"
+									min="1"
+									value={form.points_required}
+									onChange={(e) => setForm({ ...form, points_required: e.target.value })}
+									placeholder="150"
+									className="w-full mt-1 px-4 py-3 border-2 border-gray-100 bg-gray-50/50 rounded-2xl text-sm font-bold outline-none focus:border-indigo-600 focus:bg-white transition-all"
+								/>
 							</div>
 
 							<div>

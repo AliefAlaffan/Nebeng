@@ -846,7 +846,7 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="pos_mitra">
 						<Scan />
-					</ProtectedRoute>
+					</ProtectedRoute> 
 				}
 			/>
 

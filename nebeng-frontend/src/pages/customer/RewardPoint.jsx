@@ -87,7 +87,6 @@ export default function RewardPoints() {
 	}, [rewards, searchQuery, activeCategory]);
 
 	const categoryLabel = (cat) => {
-		if (cat === "Semua") return "Semua";
 		if (cat === "merchandise") return "Merchandise";
 		if (cat === "voucher") return "Voucher";
 		return cat.charAt(0).toUpperCase() + cat.slice(1);
@@ -263,35 +262,12 @@ export default function RewardPoints() {
 							onChange={(e) => setSearchQuery(e.target.value)}
 						/>
 					</div>
-					<div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
-						{categories.map((cat) => (
-							<button
-								key={cat}
-								onClick={() => setActiveCategory(cat)}
-								className={`px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${
-									activeCategory === cat ? "bg-indigo-900 text-white shadow-lg shadow-indigo-100" : "bg-white border border-gray-100 text-gray-400 hover:bg-gray-50"
-								}`}
-							>
-								{categoryLabel(cat)}
-							</button>
-						))}
-					</div>
 				</div>
 
 				{/* DAFTAR REWARD */}
 				<div className="space-y-6" ref={rewardListRef}>
 					<div className="flex items-center justify-between">
-						<h3 className="text-lg font-black text-indigo-900 tracking-tight">Spesial Diskon Buat Kamu</h3>
-						<button
-							onClick={() => {
-								setSearchQuery("");
-								setActiveCategory("Semua");
-								rewardListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-							}}
-							className="flex items-center gap-1 text-xs font-black text-pink-500 hover:text-pink-600 transition-colors uppercase tracking-widest"
-						>
-							Lihat semua <ChevronRight size={14} />
-						</button>
+						<h3 className="text-lg font-black text-indigo-900 tracking-tight">Spesial Reward Buat Kamu</h3>
 					</div>
 
 					{loadingRewards ? (
