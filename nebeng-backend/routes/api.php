@@ -36,6 +36,10 @@ use App\Http\Controllers\Api\PosMitraVoucherController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+// Webhook callback dari Midtrans (server-to-server, tidak pakai token user -
+// otentikasi dicek via signature Midtrans sendiri di dalam method-nya).
+Route::post('/payment/notification', [PaymentController::class, 'notification']);
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
@@ -47,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'me']);
     Route::post('/profile/update',[ProfileController::class,'update']);
+    Route::post('/profile/qris', [ProfileController::class, 'uploadQris']);
     Route::get('/check-pin', [PinController::class, 'checkPin']);
     Route::post('/update-pin', [PinController::class, 'updatePin']);
     Route::post('/update-password', [PasswordController::class, 'updatePassword']);
@@ -206,6 +211,12 @@ Route::middleware('auth:sanctum')->group(function () {
         // detail order di bawah
         Route::get('/orders/{id}', [OrderController::class, 'show']);
 
+        // customer upload bukti pembayaran QRIS
+        Route::post('/orders/{id}/upload-payment-proof', [OrderController::class, 'uploadPaymentProof']);
+
+        // mitra konfirmasi pembayaran (tunai/QRIS) sudah diterima
+        Route::post('/orders/{id}/confirm-payment', [OrderController::class, 'confirmPayment']);
+
     });
 
     //  DATA MITRA
@@ -283,4 +294,3 @@ Route::middleware(['auth:sanctum','role:customer' ])->group(function () {
 
     Route::post('/payment', [PaymentController::class, 'createPayment']);
 });
-
