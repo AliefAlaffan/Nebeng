@@ -13,9 +13,20 @@ export default function RiwayatSaldo() {
 
 	const [saldo, setSaldo] = useState(0);
 
-	// Data dummy berdasarkan referensi gambar image_f6fd0f.png
+	const tabs = ["Semua", "Proses", "Berhasil", "Ditolak"];
 
-	const tabs = ["Semua", "Proses", "Berhasil"];
+	// Status dari backend: pending | completed | rejected
+	const statusLabelMap = {
+		pending: "Proses",
+		completed: "Berhasil",
+		rejected: "Ditolak",
+	};
+
+	const statusColorMap = {
+		Proses: "bg-orange-100 text-orange-600",
+		Berhasil: "bg-emerald-100 text-emerald-600",
+		Ditolak: "bg-red-100 text-red-600",
+	};
 
 	const filteredData = riwayatData.filter((item) => (activeTab === "Semua" ? true : item.status === activeTab)).filter((item) => item.deskripsi.toLowerCase().includes(search.toLowerCase()));
 
@@ -45,7 +56,7 @@ export default function RiwayatSaldo() {
 					}),
 					deskripsi: item.description || "Transaksi",
 					jumlah: item.amount,
-					status: "Berhasil", // sementara semua berhasil
+					status: statusLabelMap[item.status] || "Berhasil",
 					type: item.type === "credit" ? "in" : "out",
 				}));
 
@@ -81,15 +92,6 @@ export default function RiwayatSaldo() {
 		fetchBalance();
 	}, []);
 
-	// Sebelumnya teks bulan di card "Saldo Tersisa" statis ("Oktober 2024").
-	// Sekarang otomatis ikut bulan & tahun saat ini.
-	const currentMonthLabel = new Date()
-		.toLocaleDateString("id-ID", {
-			month: "long",
-			year: "numeric",
-		})
-		.toUpperCase();
-
 	return (
 		<MitraLayout>
 			<div className="w-full max-w-screen-xl mx-auto px-4 py-6 space-y-6">
@@ -118,7 +120,7 @@ export default function RiwayatSaldo() {
 								<h2 className="text-3xl font-black tracking-tighter mb-6">Rp {saldo.toLocaleString("id-ID")}</h2>
 								<div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider bg-white/10 w-fit px-3 py-1.5 rounded-full border border-white/10">
 									<CalendarIcon size={12} className="text-indigo-300" />
-									{currentMonthLabel}
+									{new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
 								</div>
 							</div>
 							<Wallet size={140} className="absolute -right-8 -bottom-8 text-white opacity-5 transform -rotate-12 group-hover:scale-110 transition-transform duration-700" />
@@ -169,7 +171,7 @@ export default function RiwayatSaldo() {
 											<div className="min-w-0">
 												<div className="flex items-center gap-2 mb-1">
 													<h4 className="text-sm font-black text-gray-800 truncate">{item.deskripsi}</h4>
-													<span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter ${item.status === "Berhasil" ? "bg-emerald-100 text-emerald-600" : "bg-orange-100 text-orange-600"}`}>{item.status}</span>
+													<span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shrink-0 ${statusColorMap[item.status] || "bg-gray-100 text-gray-500"}`}>{item.status}</span>
 												</div>
 												<p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
 													{item.tanggal} • {item.jam}

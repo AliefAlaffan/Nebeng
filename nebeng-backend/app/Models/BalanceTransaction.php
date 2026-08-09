@@ -11,7 +11,8 @@ class BalanceTransaction extends Model
         'order_id',
         'type',
         'amount',
-        'description'
+        'description',
+        'status',
     ];
 
     public function user()

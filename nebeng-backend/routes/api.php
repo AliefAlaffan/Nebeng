@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\MitraVehicleController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RewardManagementController;
 use App\Http\Controllers\Api\PosMitraVoucherController;
+use App\Http\Controllers\Api\AdminBalanceController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -293,4 +294,11 @@ Route::middleware(['auth:sanctum','role:customer' ])->group(function () {
     Route::post('/item-orders', [ItemOrderController::class,'store']);
 
     Route::post('/payment', [PaymentController::class, 'createPayment']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/admin/withdrawals/pending', [AdminBalanceController::class, 'pendingWithdrawals']);
+    Route::get('/admin/withdrawals', [AdminBalanceController::class, 'allWithdrawals']);
+    Route::post('/admin/withdrawals/{id}/approve', [AdminBalanceController::class, 'approve']);
+    Route::post('/admin/withdrawals/{id}/reject', [AdminBalanceController::class, 'reject']);
 });

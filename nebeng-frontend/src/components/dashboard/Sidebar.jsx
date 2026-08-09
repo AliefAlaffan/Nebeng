@@ -1,7 +1,7 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
-import { LayoutDashboard, Users, User, ClipboardList, RefreshCcw, FileText, LogOut, ChevronRight, X, Bike, ShieldCheck, Settings, DollarSign, Gift } from "lucide-react";
+import { LayoutDashboard, Users, User, ClipboardList, RefreshCcw, FileText, LogOut, ChevronRight, X, Bike, ShieldCheck, Settings, DollarSign, Gift, Wallet } from "lucide-react";
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 	const location = useLocation();
@@ -187,6 +187,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 							<ChevronRight size={16} />
 						</NavLink>
 
+						{/* Penarikan Saldo */}
+						<NavLink to="/admin/penarikan-saldo" onClick={() => setSidebarOpen(false)} className={menuStyle}>
+							<div className="flex items-center gap-4">
+								<Wallet size={20} />
+								<span className="text-sm font-bold">Penarikan Saldo</span>
+							</div>
+							<ChevronRight size={16} />
+						</NavLink>
+
 						{/* PENGATURAN SISTEM */}
 						<button onClick={() => setOpenPengaturan(!openPengaturan)} className="group flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all duration-300 hover:bg-white/5 text-white/60 hover:text-white">
 							<div className="flex items-center gap-4">
@@ -208,6 +217,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 								</NavLink>
 							</div>
 						)}
+
+						{/* Profil */}
+						<NavLink to="/admin/profil" onClick={() => setSidebarOpen(false)} className={menuStyle}>
+							<div className="flex items-center gap-4">
+								<User size={20} />
+								<span className="text-sm font-bold">Profil</span>
+							</div>
+							<ChevronRight size={16} />
+						</NavLink>
 
 						{/* REFUND */}
 						{/* <NavLink to="/admin/refund" onClick={() => setSidebarOpen(false)} className={menuStyle}>
