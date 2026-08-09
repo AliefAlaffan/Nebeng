@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Reward;
 use App\Models\RewardTransaction;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class RewardController extends Controller
 {
@@ -31,10 +32,22 @@ class RewardController extends Controller
     }
 
     /**
-     * Tukar poin dengan reward tertentu. Sekarang berbasis reward_id
-     * (bukan poin mentah dari frontend lagi) supaya server yang menentukan
-     * harga poin sebenarnya + validasi stok, bukan percaya begitu saja
-     * angka yang dikirim client.
+     * Bikin kode unik yang belum pernah dipakai (dicek ke database
+     * supaya tidak ada tabrakan, walaupun kemungkinannya sangat kecil).
+     */
+    private function generateUniqueCode(): string
+    {
+        do {
+            $code = 'NBG-' . strtoupper(Str::random(8));
+        } while (RewardTransaction::where('unique_code', $code)->exists());
+
+        return $code;
+    }
+
+    /**
+     * Tukar poin dengan reward tertentu. Setelah berhasil, customer dapat
+     * kode unik yang nanti ditunjukkan/dimasukkan di Pos Mitra untuk
+     * mengambil barangnya.
      */
     public function redeem(Request $request)
     {
@@ -63,7 +76,10 @@ class RewardController extends Controller
             ], 400);
         }
 
-        DB::transaction(function () use ($user, $reward) {
+        $uniqueCode = $this->generateUniqueCode();
+        $transaction = null;
+
+        DB::transaction(function () use ($user, $reward, $uniqueCode, &$transaction) {
             $user->reward_points -= $reward->points_required;
             $user->save();
 
@@ -71,18 +87,22 @@ class RewardController extends Controller
                 $reward->decrement('stock');
             }
 
-            RewardTransaction::create([
+            $transaction = RewardTransaction::create([
                 'user_id' => $user->id,
                 'reward_id' => $reward->id,
                 'type' => 'redeem',
                 'points' => $reward->points_required,
                 'description' => 'Penukaran: ' . $reward->title,
+                'unique_code' => $uniqueCode,
+                'claim_status' => 'unclaimed',
             ]);
         });
 
         return response()->json([
-            'message' => 'Reward berhasil ditukar! Tim kami akan segera memprosesnya.',
+            'message' => 'Reward berhasil ditukar! Tunjukkan kode unik ini ke Pos Mitra untuk mengambil barangnya.',
             'remaining_points' => $user->fresh()->reward_points,
+            'unique_code' => $uniqueCode,
+            'reward' => $reward,
         ]);
     }
 }

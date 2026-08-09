@@ -1,7 +1,7 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
-import { LayoutDashboard, Users, User, ClipboardList, RefreshCcw, FileText, LogOut, ChevronRight, X, Bike, ShieldCheck, Settings, DollarSign } from "lucide-react";
+import { LayoutDashboard, Users, User, ClipboardList, RefreshCcw, FileText, LogOut, ChevronRight, X, Bike, ShieldCheck, Settings, DollarSign, Gift } from "lucide-react";
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 	const location = useLocation();
@@ -174,6 +174,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 							<div className="flex items-center gap-4">
 								<ClipboardList size={20} />
 								<span className="text-sm font-bold">Pesanan</span>
+							</div>
+							<ChevronRight size={16} />
+						</NavLink>
+
+						{/* KELOLA REWARD */}
+						<NavLink to="/admin/rewards" onClick={() => setSidebarOpen(false)} className={menuStyle}>
+							<div className="flex items-center gap-4">
+								<Gift size={20} />
+								<span className="text-sm font-bold">Kelola Reward</span>
 							</div>
 							<ChevronRight size={16} />
 						</NavLink>

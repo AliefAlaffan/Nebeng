@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, Star, ArrowUpRight, ArrowDownLeft, Calendar, Filter } from "lucide-react";
+import { ChevronLeft, Star, ArrowUpRight, ArrowDownLeft, Calendar, Ticket, CheckCircle2, Clock3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function RewardHistory() {
@@ -107,29 +107,48 @@ export default function RewardHistory() {
 						<div className="space-y-4">
 							{filteredHistory.length > 0 ? (
 								filteredHistory.map((item) => (
-									<div key={item.id} className="bg-white rounded-[28px] p-4 md:p-5 shadow-sm border border-gray-50 flex items-center justify-between group hover:shadow-md hover:-translate-y-1 transition-all duration-300 gap-3">
-										{/* SISI KIRI: Ikon dan Deskripsi */}
-										<div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
-											<div className={`p-3 rounded-2xl shrink-0 ${item.type === "earn" ? "bg-emerald-50 text-emerald-500" : "bg-red-50 text-red-500"}`}>{item.type === "earn" ? <ArrowUpRight size={20} /> : <ArrowDownLeft size={20} />}</div>
-
-											{/* Pembungkus teks dengan min-w-0 agar truncate/wrap bekerja */}
-											<div className="min-w-0 flex-1">
-												<h4 className="text-sm font-black text-gray-800 break-words line-clamp-2 md:line-clamp-1 mb-1 leading-tight">{item.description}</h4>
-												<div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-													<Calendar size={12} className="shrink-0" />
-													<span className="truncate">{new Date(item.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+									<div key={item.id} className="bg-white rounded-[28px] p-4 md:p-5 shadow-sm border border-gray-50 hover:shadow-md transition-all duration-300">
+										<div className="flex items-center justify-between gap-3">
+											{/* SISI KIRI: Ikon dan Deskripsi */}
+											<div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+												<div className={`p-3 rounded-2xl shrink-0 ${item.type === "earn" ? "bg-emerald-50 text-emerald-500" : "bg-red-50 text-red-500"}`}>
+													{item.type === "earn" ? <ArrowUpRight size={20} /> : <ArrowDownLeft size={20} />}
 												</div>
+
+												{/* Pembungkus teks dengan min-w-0 agar truncate/wrap bekerja */}
+												<div className="min-w-0 flex-1">
+													<h4 className="text-sm font-black text-gray-800 break-words line-clamp-2 md:line-clamp-1 mb-1 leading-tight">{item.description}</h4>
+													<div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+														<Calendar size={12} className="shrink-0" />
+														<span className="truncate">{new Date(item.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+													</div>
+												</div>
+											</div>
+
+											{/* SISI KANAN: Nominal Poin */}
+											<div className="text-right shrink-0 ml-2">
+												<p className={`text-base md:text-lg font-black tracking-tighter ${item.type === "earn" ? "text-emerald-500" : "text-red-500"}`}>
+													{item.type === "earn" ? "+" : "-"}
+													{item.points}
+												</p>
+												<p className="text-[9px] font-black text-gray-300 uppercase">Points</p>
 											</div>
 										</div>
 
-										{/* SISI KANAN: Nominal Poin */}
-										<div className="text-right shrink-0 ml-2">
-											<p className={`text-base md:text-lg font-black tracking-tighter ${item.type === "earn" ? "text-emerald-500" : "text-red-500"}`}>
-												{item.type === "earn" ? "+" : "-"}
-												{item.points}
-											</p>
-											<p className="text-[9px] font-black text-gray-300 uppercase">Points</p>
-										</div>
+										{/* KODE UNIK VOUCHER (khusus transaksi redeem) */}
+										{item.type === "redeem" && item.unique_code && (
+											<div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between gap-3 flex-wrap">
+												<div className="flex items-center gap-2">
+													<Ticket size={14} className="text-indigo-400 shrink-0" />
+													<span className="text-xs font-black text-indigo-900 tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg">{item.unique_code}</span>
+												</div>
+
+												<div className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${item.claim_status === "claimed" ? "text-gray-400" : "text-amber-600"}`}>
+													{item.claim_status === "claimed" ? <CheckCircle2 size={13} /> : <Clock3 size={13} />}
+													{item.claim_status === "claimed" ? "Sudah Diambil" : "Belum Diambil"}
+												</div>
+											</div>
+										)}
 									</div>
 								))
 							) : (

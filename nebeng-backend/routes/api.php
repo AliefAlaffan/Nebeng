@@ -29,6 +29,8 @@ use App\Http\Controllers\Api\AdminPricingController;
 use App\Http\Controllers\Api\AdminPickupPointController;
 use App\Http\Controllers\Api\MitraVehicleController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\RewardManagementController;
+use App\Http\Controllers\Api\PosMitraVoucherController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -73,6 +75,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
+    // KELOLA REWARD (admin)
+    Route::get('/admin/rewards', [RewardManagementController::class, 'index']);
+    Route::get('/admin/rewards/{id}', [RewardManagementController::class, 'show']);
+    Route::post('/admin/rewards', [RewardManagementController::class, 'store']);
+    Route::post('/admin/rewards/{id}', [RewardManagementController::class, 'update']); // pakai POST + _method=PUT dari frontend (upload file)
+    Route::delete('/admin/rewards/{id}', [RewardManagementController::class, 'destroy']);
+
+});
+
+Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/mitra/trips/{id}/generate-qr',[MitraTripQrController::class, 'generate']);
     Route::post('/mitra/trips/{tripId}/generate-departure-qr',[MitraTripQrController::class, 'generateDepartureQr']);
@@ -80,6 +92,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pos-mitra/scan-departure-qr',[TripController::class, 'scanDepartureQr']);
     Route::post('/pos-mitra/scan-customer-qr', [TripController::class, 'scanCustomerQr']);
     Route::post('/customer/orders/{orderId}/generate-qr',[CustomerOrderQrController::class, 'generate']);
+});
+
+Route::middleware(['auth:sanctum', 'role:pos_mitra'])->group(function () {
+    Route::get('/pos-mitra/vouchers/{code}', [PosMitraVoucherController::class, 'find']);
+    Route::post('/pos-mitra/vouchers/{code}/claim', [PosMitraVoucherController::class, 'claim']);
 });
 
 
@@ -266,3 +283,4 @@ Route::middleware(['auth:sanctum','role:customer' ])->group(function () {
 
     Route::post('/payment', [PaymentController::class, 'createPayment']);
 });
+

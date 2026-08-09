@@ -30,6 +30,7 @@ const ProfileAdmin = lazy(() => import("../pages/admin/Profile"));
 const EditProfileAdmin = lazy(() => import("../pages/admin/EditProfile"));
 const AturPasswordAdmin = lazy(() => import("../pages/customer/AturPassword"));
 const AturHarga = lazy(() => import("../pages/admin/PricingManagement"));
+const KelolaReward = lazy(() => import("../pages/admin/KelolaReward"));
 
 /* CUSTOMER */
 const DashboardCustomer = lazy(() => import("../pages/customer/Dashboard"));
@@ -99,6 +100,7 @@ const ProfilePosMitra = lazy(() => import("../pages/pos_mitra/Profile"));
 const EditProfilePosMitra = lazy(() => import("../pages/pos_mitra/EditProfile"));
 const AturPINPosMitra = lazy(() => import("../pages/pos_mitra/AturPin"));
 const AturPasswordPosMitra = lazy(() => import("../pages/pos_mitra/AturPassword"));
+const KlaimVoucher = lazy(() => import("../pages/pos_mitra/KlaimVoucher"));
 
 function RouteLoadingFallback() {
 	return (
@@ -172,6 +174,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="admin">
 						<AturHarga />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/admin/rewards"
+				element={
+					<ProtectedRoute role="admin">
+						<KelolaReward />
 					</ProtectedRoute>
 				}
 			/>
@@ -835,6 +846,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="pos_mitra">
 						<Scan />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/pos-mitra/klaim-voucher"
+				element={
+					<ProtectedRoute role="pos_mitra">
+						<KlaimVoucher />
 					</ProtectedRoute>
 				}
 			/>

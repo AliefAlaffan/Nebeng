@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Home, Clock, MessageSquare, User, LogOut, QrCode } from "lucide-react";
+import { Home, Clock, MessageSquare, User, LogOut, QrCode, Ticket } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function PosMitraSidebar() {
@@ -14,6 +14,7 @@ export default function PosMitraSidebar() {
 	];
 
 	const rightMenus = [
+		{ name: "Voucher", path: "/pos-mitra/klaim-voucher", icon: Ticket },
 		{ name: "Pesan", path: "/pos-mitra/pesan-mitra", icon: MessageSquare },
 		{ name: "Profil", path: "/pos-mitra/profil", icon: User },
 	];
@@ -143,7 +144,7 @@ export default function PosMitraSidebar() {
 						<span className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tight">Scan</span>
 					</div>
 
-					{/* Sisi Kanan: Pesan & Profil */}
+					{/* Sisi Kanan: Voucher, Pesan & Profil */}
 					<div className="flex flex-1 justify-around items-center pl-6">
 						{rightMenus.map((item) => (
 							<NavLink key={item.name} to={item.path} className={({ isActive }) => `relative flex flex-col items-center pt-2 w-16 transition-colors ${isActive ? "text-[#0b2f83]" : "text-gray-400"}`}>

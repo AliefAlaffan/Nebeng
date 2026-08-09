@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { Search, Star, ChevronRight, ChevronLeft, PlusCircle, History, X, Bike, Car, Package, Gift, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { Search, Star, ChevronRight, ChevronLeft, PlusCircle, History, X, Bike, Car, Package, Gift, CheckCircle2, Loader2, AlertTriangle, Copy, Check } from "lucide-react";
 
 const FALLBACK_IMAGE = "https://placehold.co/400x400/eef2ff/4338ca?text=Nebeng+Reward";
 
@@ -22,7 +22,8 @@ export default function RewardPoints() {
 	// ================= ALUR PENUKARAN =================
 	const [confirmReward, setConfirmReward] = useState(null); // reward yang mau dikonfirmasi tukar
 	const [isRedeeming, setIsRedeeming] = useState(false);
-	const [redeemResult, setRedeemResult] = useState(null); // { success: bool, message: string }
+	const [redeemResult, setRedeemResult] = useState(null); // { success, message, uniqueCode?, rewardTitle? }
+	const [codeCopied, setCodeCopied] = useState(false);
 
 	const categories = useMemo(() => {
 		const unique = Array.from(new Set(rewards.map((r) => r.category)));
@@ -125,7 +126,12 @@ export default function RewardPoints() {
 			}
 
 			setPoints(data.remaining_points);
-			setRedeemResult({ success: true, message: data.message, title: confirmReward.title });
+			setRedeemResult({
+				success: true,
+				message: data.message,
+				uniqueCode: data.unique_code,
+				rewardTitle: confirmReward.title,
+			});
 
 			// refresh katalog (stok bisa berubah) & riwayat poin
 			fetchRewards();
@@ -136,6 +142,18 @@ export default function RewardPoints() {
 			setIsRedeeming(false);
 			setConfirmReward(null);
 		}
+	};
+
+	const handleCopyCode = () => {
+		if (!redeemResult?.uniqueCode) return;
+		navigator.clipboard.writeText(redeemResult.uniqueCode);
+		setCodeCopied(true);
+		setTimeout(() => setCodeCopied(false), 2000);
+	};
+
+	const closeResultPopup = () => {
+		setRedeemResult(null);
+		setCodeCopied(false);
 	};
 
 	return (
@@ -370,7 +388,7 @@ export default function RewardPoints() {
 			{/* POPUP HASIL (SUKSES / GAGAL) */}
 			{redeemResult && (
 				<div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-					<div className="absolute inset-0 bg-indigo-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setRedeemResult(null)}></div>
+					<div className="absolute inset-0 bg-indigo-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={closeResultPopup}></div>
 
 					<div className="relative bg-white w-full max-w-sm rounded-[40px] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-300">
 						<div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 ${redeemResult.success ? "bg-emerald-50 text-emerald-500" : "bg-red-50 text-red-500"}`}>
@@ -378,9 +396,27 @@ export default function RewardPoints() {
 						</div>
 
 						<h2 className="text-xl font-black text-indigo-900 mb-2">{redeemResult.success ? "Berhasil!" : "Gagal Menukar"}</h2>
-						<p className="text-sm text-gray-500 mb-8 leading-relaxed">{redeemResult.message}</p>
 
-						<button onClick={() => setRedeemResult(null)} className="w-full py-3.5 rounded-2xl bg-indigo-900 text-white font-black text-sm shadow-lg hover:bg-indigo-800 transition-all">
+						{redeemResult.success && redeemResult.rewardTitle && <p className="text-sm text-gray-600 font-bold mb-3">{redeemResult.rewardTitle}</p>}
+
+						{redeemResult.success && redeemResult.uniqueCode ? (
+							<>
+								<p className="text-xs text-gray-400 mb-3 leading-relaxed">Tunjukkan atau sebutkan kode ini ke Pos Mitra terdekat untuk mengambil hadiahmu:</p>
+
+								<div className="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl py-4 px-4 mb-3 flex items-center justify-between gap-3">
+									<span className="text-lg font-black text-indigo-900 tracking-widest">{redeemResult.uniqueCode}</span>
+									<button onClick={handleCopyCode} className="p-2 bg-white rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all shrink-0">
+										{codeCopied ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} className="text-indigo-600" />}
+									</button>
+								</div>
+
+								<p className="text-[11px] text-gray-400 mb-6">Kode ini juga tersimpan di halaman Riwayat Poin kamu.</p>
+							</>
+						) : (
+							<p className="text-sm text-gray-500 mb-8 leading-relaxed">{redeemResult.message}</p>
+						)}
+
+						<button onClick={closeResultPopup} className="w-full py-3.5 rounded-2xl bg-indigo-900 text-white font-black text-sm shadow-lg hover:bg-indigo-800 transition-all">
 							Tutup
 						</button>
 					</div>
