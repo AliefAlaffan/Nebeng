@@ -211,136 +211,136 @@ class TripController extends Controller
             );
 
             // ====================================
-// CREATE TRIP
-// ====================================
+            // CREATE TRIP
+            // ====================================
 
-if ($request->tebengan_type === "Barang") {
+            if ($request->tebengan_type === "Barang") {
 
-    // =========================
-    // KONVERSI KAPASITAS
-    // =========================
+                // =========================
+                // KONVERSI KAPASITAS
+                // =========================
 
-    $capacityMap = [
+                $capacityMap = [
 
-        'xxs' => 0.5,
-        'xs' => 1,
-        'kecil' => 5,
-        'sedang' => 10,
-        'besar' => 15,
-    ];
+                    'xxs' => 0.5,
+                    'xs' => 1,
+                    'kecil' => 5,
+                    'sedang' => 10,
+                    'besar' => 15,
+                ];
 
-    $capacityValue =
-        $capacityMap[$request->baggage_capacity] ?? 1;
+                $capacityValue =
+                    $capacityMap[$request->baggage_capacity] ?? 1;
 
-    // =========================
-    // KHUSUS NEBENG BARANG
-    // =========================
+                // =========================
+                // KHUSUS NEBENG BARANG
+                // =========================
 
-    $tripPassenger = Trip::create([
+                $tripPassenger = Trip::create([
 
-        'mitra_id' => auth()->id(),
+                    'mitra_id' => auth()->id(),
 
-        'mitra_vehicle_id' => $mitraVehicle->id ?? null,
+                    'mitra_vehicle_id' => $mitraVehicle->id ?? null,
 
-        'vehicle_type' =>
-            $request->vehicle_type,
+                    'vehicle_type' =>
+                        $request->vehicle_type,
 
-        'departure_date' =>
-            $request->departure_date,
+                    'departure_date' =>
+                        $request->departure_date,
 
-        'departure_time' =>
-            $request->departure_time,
+                    'departure_time' =>
+                        $request->departure_time,
 
-        // ====================
-        // KAPASITAS BARANG
-        // ====================
+                    // ====================
+                    // KAPASITAS BARANG
+                    // ====================
 
-        'seat_total' =>
-            $capacityValue,
+                    'seat_total' =>
+                        $capacityValue,
 
-        'seat_available' =>
-            $capacityValue,
+                    'seat_available' =>
+                        $capacityValue,
 
-        'origin_point_id' =>
-            $request->origin_point_id,
+                    'origin_point_id' =>
+                        $request->origin_point_id,
 
-        'destination_point_id' =>
-            $request->destination_point_id,
+                    'destination_point_id' =>
+                        $request->destination_point_id,
 
-        'baggage_capacity' =>
-            $request->baggage_capacity,
+                    'baggage_capacity' =>
+                        $request->baggage_capacity,
 
-        'price' => $goodsPrice,
+                    'price' => $goodsPrice,
 
-        // =========================
-        // MAPS DATA
-        // =========================
+                    // =========================
+                    // MAPS DATA
+                    // =========================
 
-        'estimated_distance_km' =>
-            $route['distance_km'] ?? null,
+                    'estimated_distance_km' =>
+                        $route['distance_km'] ?? null,
 
-        'estimated_duration_min' =>
-            $route['duration_min'] ?? null,
+                    'estimated_duration_min' =>
+                        $route['duration_min'] ?? null,
 
-        'route_geojson' =>
-            isset($route['geometry'])
-                ? json_encode($route['geometry'])
-                : null,
+                    'route_geojson' =>
+                        isset($route['geometry'])
+                            ? json_encode($route['geometry'])
+                            : null,
 
-        'status' => 'active'
-    ]);
+                    'status' => 'active'
+                ]);
 
-} else {
+            } else {
 
-    // =========================
-    // TEBENGAN PENUMPANG
-    // =========================
+                // =========================
+                // TEBENGAN PENUMPANG
+                // =========================
 
-    $tripPassenger = Trip::create([
+                $tripPassenger = Trip::create([
 
-        'mitra_id' => auth()->id(),
+                    'mitra_id' => auth()->id(),
 
-        'mitra_vehicle_id' => $mitraVehicle->id ?? null,
+                    'mitra_vehicle_id' => $mitraVehicle->id ?? null,
 
-        'vehicle_type' =>
-            $request->vehicle_type,
+                    'vehicle_type' =>
+                        $request->vehicle_type,
 
-        'departure_date' =>
-            $request->departure_date,
+                    'departure_date' =>
+                        $request->departure_date,
 
-        'departure_time' =>
-            $request->departure_time,
+                    'departure_time' =>
+                        $request->departure_time,
 
-        'seat_total' =>
-            $request->seat_total,
+                    'seat_total' =>
+                        $request->seat_total,
 
-        'seat_available' =>
-            $request->seat_total,
+                    'seat_available' =>
+                        $request->seat_total,
 
-        'origin_point_id' =>
-            $request->origin_point_id,
+                    'origin_point_id' =>
+                        $request->origin_point_id,
 
-        'destination_point_id' =>
-            $request->destination_point_id,
+                    'destination_point_id' =>
+                        $request->destination_point_id,
 
-        'baggage_capacity' => null,
+                    'baggage_capacity' => null,
 
-        'price' => $passengerPrice,
+                    'price' => $passengerPrice,
 
-        'estimated_distance_km' =>
-            $route['distance_km'] ?? null,
+                    'estimated_distance_km' =>
+                        $route['distance_km'] ?? null,
 
-        'estimated_duration_min' =>
-            $route['duration_min'] ?? null,
+                    'estimated_duration_min' =>
+                        $route['duration_min'] ?? null,
 
-        'route_geojson' =>
-            isset($route['geometry'])
-                ? json_encode($route['geometry'])
-                : null,
+                    'route_geojson' =>
+                        isset($route['geometry'])
+                            ? json_encode($route['geometry'])
+                            : null,
 
-        'status' => 'active'
-    ]);
-}
+                    'status' => 'active'
+                ]);
+            }
 
             // ====================================
             // JIKA BARANG DAN TEBENGAN
@@ -601,7 +601,7 @@ if ($request->tebengan_type === "Barang") {
 
         $session = TripQrSession::where('token', $request->qr_token)
             ->where('purpose', 'arrival')
-            ->with('trip')
+            ->with('trip.orders')
             ->first();
 
         if (!$session) {
@@ -627,48 +627,41 @@ if ($request->tebengan_type === "Barang") {
             'used_at' => now(),
         ]);
 
-        $session->trip->update([
+        $trip = $session->trip;
+        
+        $trip->update([
             'status' => 'completed'
         ]);
 
-        $session->trip->load('orders');
-
         NotificationService::send(
-            $session->trip->mitra_id,
+            $trip->mitra_id,
             'Perjalanan Selesai',
             'Trip kamu telah selesai. Saldo akan bertambah setelah pembayaran dikonfirmasi.',
             'trip',
             "/mitra/riwayat"
         );
 
-       foreach ($session->trip->orders as $order) {
-            NotificationService::send(
-                $order->customer_id,
-                'Perjalanan Selesai',
-                'Kamu sudah sampai tujuan. Jangan lupa beri penilaian untuk mitra (opsional).',
-                'trip',
-                "/customer/perjalanan/{$session->trip->id}"
-            );
-
+        foreach ($trip->orders as $order) {
             // ==========================================
-            // LOGIKA PENAMBAHAN POIN (DIPINDAH KE SINI)
+            // 1. HITUNG POIN BERDASARKAN KENDARAAN
             // ==========================================
             $customer = User::find($order->customer_id);
-            if ($customer) {
-                $points = 0;
+            $points = 0;
 
-                switch ($session->trip->vehicle_type) {
-                    case 'motor':
-                        $points = 15;
-                        break;
-                    case 'mobil':
-                        $points = 25;
-                        break;
-                    case 'barang':
-                        $points = 20;
-                        break;
+            if ($customer) {
+                $vType = strtolower($trip->vehicle_type);
+
+                if (str_contains($vType, 'motor')) {
+                    $points = 15;
+                } elseif (str_contains($vType, 'mobil')) {
+                    $points = 25;
+                } elseif (str_contains($vType, 'barang')) {
+                    $points = 20;
+                } else {
+                    $points = 15;
                 }
 
+                // Tambahkan poin ke database
                 $customer->reward_points += $points;
                 $customer->save();
 
@@ -676,33 +669,38 @@ if ($request->tebengan_type === "Barang") {
                     'user_id' => $customer->id,
                     'type' => 'earn',
                     'points' => $points,
-                    'description' => 'Poin dari penyelesaian trip #' . $session->trip->id
+                    'description' => 'Poin dari penyelesaian trip #' . $trip->id
                 ]);
-
-                if ($points > 0) {
-                    NotificationService::send(
-                        $customer->id,
-                        'Dapat Poin Hadiah',
-                        "Kamu mendapat {$points} poin karena trip telah selesai.",
-                        'reward',
-                        '/customer/reward-points'
-                    );
-                }
             }
+
             // ==========================================
+            // 2. KIRIM SATU NOTIFIKASI GABUNGAN YANG RAPI
+            // ==========================================
+            $notifMessage = 'Kamu sudah sampai tujuan. Jangan lupa beri penilaian untuk mitra (opsional).';
+            if ($points > 0) {
+                $notifMessage = "Kamu sudah sampai tujuan dan mendapatkan +{$points} poin reward! Jangan lupa beri penilaian untuk mitra.";
+            }
+
+            NotificationService::send(
+                $order->customer_id,
+                'Perjalanan Selesai',
+                $notifMessage,
+                'trip',
+                "/customer/perjalanan/{$trip->id}"
+            );
         }
 
         NotificationService::send(
             auth()->id(),
             'QR Kedatangan Terverifikasi',
-            "Trip #{$session->trip->id} berhasil diselesaikan.",
+            "Trip #{$trip->id} berhasil diselesaikan.",
             'system',
             '/pos-mitra/aktivitas'
         );
 
         return response()->json([
             'message' => 'Trip berhasil diselesaikan',
-            'trip_id' => $session->trip->id,
+            'trip_id' => $trip->id,
             'status' => 'completed'
         ]);
     }

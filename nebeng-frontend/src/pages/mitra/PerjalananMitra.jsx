@@ -194,7 +194,7 @@ export default function PerjalananMitra() {
 						paymentStatus: order.payment_status,
 						paymentProof: order.payment_proof,
 
-						readinessStatus: order.readiness_status,
+						readinessStatus: order.readiness_status || 'pending',
 					}));
 
 					setCustomers(formattedCustomers);
@@ -670,12 +670,15 @@ export default function PerjalananMitra() {
 						{/* MAIN ACTION BUTTON */}
 						<div className="pt-4 sticky bottom-0 bg-white space-y-3">
 							{tripStatus === "active" && customers.length === 0 && (
-								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer memesan tebengan ini sebelum bisa berangkat.</p>
-							)}
+                            <p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer memesan tebengan ini sebelum bisa berangkat.</p>
+                        )}
 
-							{tripStatus === "active" && customers.length > 0 && !customers.every((c) => c.readinessStatus === "ready") && (
-								<p className="text-xs text-center font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4">Menunggu customer scan QR kedatangan di Pos Mitra sebelum bisa berangkat.</p>
-							)}
+                        {/* Pengecekan fleksibel: jika ada customer yang belum ready */}
+                        {tripStatus === "active" && customers.length > 0 && customers.some((c) => c.readinessStatus !== "ready") && (
+                            <div className="bg-amber-50 border border-amber-100 rounded-2xl py-3 px-4 text-center">
+                                <p className="text-xs font-bold text-amber-600">Sebagian customer belum scan QR. Mitra tetap bisa memaksa berangkat jika diperlukan.</p>
+                            </div>
+                        )}
 
 							{tripStatus === "arrived_destination" && (
 								<p className="text-xs text-center font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-2xl py-3 px-4">Tunjukkan QR di bawah ini kepada petugas Pos Mitra untuk menyelesaikan perjalanan.</p>

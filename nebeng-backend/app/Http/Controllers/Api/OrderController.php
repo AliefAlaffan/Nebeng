@@ -30,9 +30,14 @@ class OrderController extends Controller
 
         $trip = Trip::findOrFail($request->trip_id);
 
+        // Cek apakah customer sudah punya pesanan aktif yang BENAR-BENAR VALID/LUNAS (bukan yang mangkrak belum bayar)
         $existingOrder = Order::where('trip_id', $trip->id)
             ->where('customer_id', auth()->id())
-            ->whereIn('status', ['pending', 'completed']) 
+            ->where(function($query) {
+                // Blokir jika status pembayaran sudah paid atau waiting confirmation (artinya sudah pernah diproses bayar)
+                $query->where('payment_status', 'paid')
+                      ->orWhere('payment_status', 'waiting_confirmation');
+            })
             ->first();
 
         if ($existingOrder) {
@@ -47,62 +52,39 @@ class OrderController extends Controller
             ], 400);
         }
 
-        $order = Order::create([
-            'trip_id' => $trip->id,
-            'customer_id' => auth()->id(),
-            'pickup_address' => $request->pickup_address,
-            'drop_address' => $request->drop_address,
-            'price' => $trip->price,
-            'payment_method' => $request->payment_method, // 🔥 ini inti
-            'status' => 'completed',
-            // Baik tunai maupun QRIS baru dianggap lunas setelah mitra
-            // konfirmasi pembayaran diterima (lihat OrderController::confirmPayment).
-            'payment_status' => 'unpaid'
-        ]);
+        // Cek jika ada order sebelumnya yang mangkrak (unpaid), timpa atau gunakan kembali agar tidak menumpuk
+        $pendingOrder = Order::where('trip_id', $trip->id)
+            ->where('customer_id', auth()->id())
+            ->where('payment_status', 'unpaid')
+            ->first();
+
+        if ($pendingOrder) {
+            // Update data order yang mangkrak sebelumnya
+            $pendingOrder->update([
+                'pickup_address' => $request->pickup_address,
+                'drop_address' => $request->drop_address,
+                'payment_method' => $request->payment_method,
+            ]);
+            $order = $pendingOrder;
+        } else {
+            // Buat order baru dengan status awal masih unpaid & status pending (belum mengurangi seat dulu sebelum dibayar/diproses)
+            $order = Order::create([
+                'trip_id' => $trip->id,
+                'customer_id' => auth()->id(),
+                'pickup_address' => $request->pickup_address,
+                'drop_address' => $request->drop_address,
+                'price' => $trip->price,
+                'payment_method' => $request->payment_method, 
+                'status' => 'pending', // Belum aktif penuh sebelum dibayar
+                'payment_status' => 'unpaid'
+            ]);
+        }
 
         $order->load('trip', 'customer');
 
-        \Log::info('BROADCAST TEST');
-        \Log::info($order->toArray());
-
-        broadcast(new NewOrderNotification($order));
-
-        // ================= NOTIFIKASI =================
-        NotificationService::send(
-            $order->customer_id,
-            'Pesanan Berhasil Dibuat',
-            "Pesanan tebengan kamu ke {$trip->destinationPoint->pos_name} berhasil dibuat. Total Rp" . number_format($order->price, 0, ',', '.') . '.',
-            'order',
-            "/customer/perjalanan/{$trip->id}"
-        );
-
-        NotificationService::send(
-            $trip->mitra_id,
-            'Ada Customer Baru',
-            "{$order->customer->name} baru saja memesan tebengan kamu.",
-            'order',
-            "/mitra/perjalanan/{$trip->id}"
-        );
-
-        $conversation = Conversation::firstOrCreate([
-            'customer_id' => auth()->id(),
-            'mitra_id' => $trip->mitra_id
-        ]);
-
-        Message::create([
-            'conversation_id' => $conversation->id,
-            'sender_id' => $trip->mitra_id,
-            'message' => 'Halo 👋 pesanan trip #' . $order->id . ' sudah kami terima. Apakah pickup dan drop address sudah sesuai?'
-        ]);
-
-        
-
-        $trip->decrement('seat_available');
-
         return response()->json([
-            'message' => 'Order berhasil',
+            'message' => 'Order berhasil dibuat, silakan lanjutkan pembayaran',
             'order' => $order,
-            'conversation_id' => $conversation->id
         ]);
     }
 
@@ -115,7 +97,6 @@ class OrderController extends Controller
             'customer'
         ])->findOrFail($id);
 
-        // pastikan hanya owner order yang bisa melihat
         if ($order->customer_id !== auth()->id()) {
             return response()->json([
                 'message' => 'Unauthorized'
@@ -148,7 +129,7 @@ class OrderController extends Controller
             'payment_proof' => 'required|image|max:4096',
         ]);
 
-        $order = Order::findOrFail($id);
+        $order = Order::with('trip.destinationPoint')->findOrFail($id);
 
         if ($order->customer_id !== auth()->id()) {
             return response()->json([
@@ -162,17 +143,33 @@ class OrderController extends Controller
             ], 400);
         }
 
-        // Hapus bukti lama kalau ada (jika upload ulang)
         if ($order->payment_proof) {
             Storage::disk('public')->delete($order->payment_proof);
         }
 
         $path = $request->file('payment_proof')->store('payment_proofs', 'public');
 
+        // BARU DI SINI PESANAN RESMI AKTIF & KURSI DIKURANGI SETELAH BUKTI DI-UPLOAD
         $order->update([
             'payment_proof' => $path,
             'payment_status' => 'waiting_confirmation',
+            'status' => 'completed'
         ]);
+
+        $trip = $order->trip;
+        if ($trip && $trip->seat_available > 0) {
+            $trip->decrement('seat_available');
+        }
+
+        broadcast(new NewOrderNotification($order));
+
+        NotificationService::send(
+            $order->customer_id,
+            'Pesanan Berhasil Dibuat',
+            "Bukti pembayaran berhasil dikirim. Pesanan tebengan kamu ke {$order->trip->destinationPoint->pos_name} resmi dibuat. Total Rp" . number_format($order->price, 0, ',', '.') . '.',
+            'order',
+            "/customer/perjalanan/{$order->trip_id}"
+        );
 
         NotificationService::send(
             $order->trip->mitra_id,
@@ -182,9 +179,21 @@ class OrderController extends Controller
             "/mitra/perjalanan/{$order->trip_id}"
         );
 
+        $conversation = Conversation::firstOrCreate([
+            'customer_id' => auth()->id(),
+            'mitra_id' => $trip->mitra_id
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $trip->mitra_id,
+            'message' => 'Halo 👋 pesanan trip #' . $order->id . ' bukti pembayaran sudah diupload. Menunggu konfirmasi.'
+        ]);
+
         return response()->json([
             'message' => 'Bukti pembayaran berhasil dikirim. Menunggu konfirmasi mitra.',
             'order' => $order,
+            'conversation_id' => $conversation->id
         ]);
     }
 
@@ -205,8 +214,6 @@ class OrderController extends Controller
             ], 400);
         }
 
-        // Bukti pembayaran hanya wajib untuk metode non-tunai (QRIS dkk).
-        // Tunai cukup konfirmasi lisan/manual dari mitra, tanpa foto.
         if ($order->payment_method !== 'cash' && !$order->payment_proof) {
             return response()->json([
                 'message' => 'Customer belum mengupload bukti pembayaran.'
@@ -215,7 +222,13 @@ class OrderController extends Controller
 
         $order->update(['payment_status' => 'paid']);
 
-        // Kredit saldo mitra sekarang, setelah pembayaran benar-benar dikonfirmasi
+        // Jika metode cash, status dan pengurangan kursi baru terjadi saat konfirmasi atau saat pesanan dibuat (sesuaikan kebutuhan cash)
+        if ($order->payment_method === 'cash' && $order->status !== 'completed') {
+            $order->update(['status' => 'completed']);
+            $order->trip->decrement('seat_available');
+            broadcast(new NewOrderNotification($order));
+        }
+
         $mitraId = $order->trip->mitra_id;
 
         $balance = DriverBalance::firstOrCreate(
@@ -230,7 +243,7 @@ class OrderController extends Controller
             'order_id' => $order->id,
             'type' => 'credit',
             'amount' => $order->price,
-            'description' => 'Pendapatan dari order #' . $order->id . ' (QRIS terkonfirmasi)'
+            'description' => 'Pendapatan dari order #' . $order->id . ' (Terkonfirmasi)'
         ]);
 
         NotificationService::send(
