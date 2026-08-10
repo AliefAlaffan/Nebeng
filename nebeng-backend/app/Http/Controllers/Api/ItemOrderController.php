@@ -50,6 +50,30 @@ class ItemOrderController extends Controller
     }
 
     // =========================
+    // AMBIL TRIP
+    // =========================
+
+    $trip = Trip::with([
+        'originPoint',
+        'destinationPoint'
+    ])->findOrFail($validated['trip_id']);
+
+    // ==========================================
+    //PENCEGAHAN DUPLIKASI PESANAN (ANTI DOUBLE ORDER)
+    // ==========================================
+    $existingOrder = Order::where('trip_id', $trip->id)
+        ->where('customer_id', auth()->id())
+        ->whereIn('status', ['pending', 'completed'])
+        ->first();
+
+    if ($existingOrder) {
+        return response()->json([
+            'message' => 'Anda sudah memiliki pesanan aktif pada trip ini.'
+        ], 400);
+    }
+    // ==========================================
+
+    // =========================
     // CREATE ITEM ORDER
     // =========================
 
@@ -75,15 +99,6 @@ class ItemOrderController extends Controller
 
         'status' => 'pending'
     ]);
-
-    // =========================
-    // AMBIL TRIP
-    // =========================
-
-    $trip = Trip::with([
-        'originPoint',
-        'destinationPoint'
-    ])->findOrFail($validated['trip_id']);
 
     // =========================
     // CREATE ORDER

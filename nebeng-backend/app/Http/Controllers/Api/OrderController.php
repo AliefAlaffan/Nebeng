@@ -25,10 +25,21 @@ class OrderController extends Controller
             'trip_id' => 'required|exists:trips,id',
             'pickup_address' => 'required|string',
             'drop_address' => 'required|string',
-            'payment_method' => 'required|in:cash,qris,ewallet' // 🔥 tambahan
+            'payment_method' => 'required|in:cash,qris,ewallet' 
         ]);
 
         $trip = Trip::findOrFail($request->trip_id);
+
+        $existingOrder = Order::where('trip_id', $trip->id)
+            ->where('customer_id', auth()->id())
+            ->whereIn('status', ['pending', 'completed']) 
+            ->first();
+
+        if ($existingOrder) {
+            return response()->json([
+                'message' => 'Anda sudah memiliki pesanan aktif pada trip ini. Tidak dapat membuat pesanan ganda.'
+            ], 400);
+        }
 
         if ($trip->seat_available <= 0) {
             return response()->json([
