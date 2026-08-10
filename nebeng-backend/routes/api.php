@@ -85,7 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/rewards', [RewardManagementController::class, 'index']);
     Route::get('/admin/rewards/{id}', [RewardManagementController::class, 'show']);
     Route::post('/admin/rewards', [RewardManagementController::class, 'store']);
-    Route::post('/admin/rewards/{id}', [RewardManagementController::class, 'update']); // pakai POST + _method=PUT dari frontend (upload file)
+    Route::put('/admin/rewards/{id}', [RewardManagementController::class, 'update']); // request asli tetap POST (krn upload file), tapi Laravel routing baca-nya sebagai PUT gara-gara _method=PUT di FormData
     Route::delete('/admin/rewards/{id}', [RewardManagementController::class, 'destroy']);
 
 });
