@@ -199,9 +199,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/admin/customer/{id}/reject', [AdminVerifController::class, 'rejectCustomer']);
 
     // DATA ORDER
-     Route::get('/admin/orders', [AdminOrderController::class, 'index']);
+    Route::get('/admin/orders', [AdminOrderController::class, 'index']);
 
-     Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware('auth:sanctum')->group(function () {
 
         // history HARUS di atas
         Route::get('/orders/history', [OrderController::class, 'history']);
@@ -274,6 +274,8 @@ Route::middleware(['auth:sanctum','role:mitra'])->group(function () {
 
 
     Route::get('/mitra/dashboard-summary', [TripController::class, 'dashboardSummary']);
+    
+    Route::post('/mitra/orders/{id}/no-show', [OrderController::class, 'markAsNoShow']);
 
 });
 

@@ -267,4 +267,33 @@ class OrderController extends Controller
             'order' => $order,
         ]);
     }
+
+    public function markAsNoShow($id)
+    {
+        try {
+            // Cari order berdasarkan ID
+            $order = \App\Models\Order::findOrFail($id);
+
+            // Pastikan status order masih dalam tahap menunggu (sesuaikan dengan status enum kamu)
+            // Update readiness_status atau status utama menjadi no_show
+            $order->update([
+                'readiness_status' => 'no_show',
+                // 'status' => 'cancelled' // Buka komentar ini jika status utama juga perlu diubah
+            ]);
+
+            // Hapus sesi QR yang menggantung agar tidak mengunci sistem
+            \App\Models\OrderQrSession::where('order_id', $id)->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer berhasil ditandai tidak hadir. Anda dapat melanjutkan perjalanan.'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses permintaan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

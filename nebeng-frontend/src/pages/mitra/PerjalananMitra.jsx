@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import QRCode from "react-qr-code";
 import SuccessPopup from "../../components/ui/SuccessPopup";
+import axios from '../../api/axios';
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -323,6 +324,40 @@ export default function PerjalananMitra() {
 		}
 	};
 
+		// ================= FITUR TANDAI TIDAK HADIR =================
+    const handleNoShow = async (orderId) => {
+        const confirmAction = window.confirm('Apakah Anda yakin ingin menandai customer ini tidak hadir? Tindakan ini tidak dapat dibatalkan.');
+        
+        if (!confirmAction) return;
+
+        try {
+            const token = localStorage.getItem("token");
+            const response = await fetch(`http://127.0.0.1:8000/api/mitra/orders/${orderId}/no-show`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Accept": "application/json"
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert(data.message || "Gagal memproses permintaan.");
+                return;
+            }
+
+            alert("Customer berhasil ditandai tidak hadir.");
+            
+            // Langsung update state lokal agar tombol hilang dan status berubah tanpa nunggu polling
+            setCustomers((prev) => prev.map((c) => (c.orderId === orderId ? { ...c, readinessStatus: "no_show" } : c)));
+            
+        } catch (err) {
+            console.error(err);
+            alert("Terjadi kesalahan sistem saat memproses.");
+        }
+    };
+
 	// ================= QR KEDATANGAN (ditampilkan langsung di halaman ini) =================
 	const handleGenerateArrivalQR = async () => {
 		try {
@@ -578,6 +613,26 @@ export default function PerjalananMitra() {
 								</div>
 							</div>
 
+							{/* Render daftar customer */}
+							{customers.map((customer) => (
+								<div key={customer.order_id} className="p-4 border rounded shadow-sm mb-2">
+									<p><strong>Nama:</strong> {customer.name}</p>
+									<p><strong>Status:</strong> {customer.readiness_status}</p>
+									
+									{/* Tombol aksi */}
+									<div className="mt-3">
+										{customer.readiness_status !== 'ready' && (
+											<button 
+												onClick={() => handleNoShow(customer.order_id)}
+												className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
+											>
+												Tandai Tidak Hadir
+											</button>
+										)}
+									</div>
+								</div>
+							))}
+
 							{customer.paymentMethod && (
 								<div className="bg-white border border-gray-100 rounded-3xl p-4">
 									{customer.paymentStatus === "paid" ? (
@@ -684,22 +739,28 @@ export default function PerjalananMitra() {
 								<p className="text-xs text-center font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-2xl py-3 px-4">Tunjukkan QR di bawah ini kepada petugas Pos Mitra untuk menyelesaikan perjalanan.</p>
 							)}
 
-							<button
-								onClick={tripStatus === "completed" ? () => navigate("/mitra/dashboard") : handleStatusAction}
-								disabled={loadingArrivalQR || (tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready")))}
-								className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] shadow-xl
-            ${
-							tripStatus === "completed"
-								? "bg-emerald-500 shadow-emerald-100 hover:bg-emerald-600"
-								: tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready"))
-								? "bg-gray-300 shadow-none cursor-not-allowed"
-								: "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"
-						}
-        `}
-							>
-								{tripStatus === "completed" ? (
-									<>
-										<CheckCircle2 size={18} />
+							{tripStatus === "arrived_destination" && (
+                                <p className="text-xs text-center font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-2xl py-3 px-4">Tunjukkan QR di bawah ini kepada petugas Pos Mitra untuk menyelesaikan perjalanan.</p>
+                            )}
+
+                            <button
+                                onClick={tripStatus === "completed" ? () => navigate("/mitra/dashboard") : handleStatusAction}
+                                // PERHATIKAN BARIS DI BAWAH INI: Kita tambahkan validasi c.readinessStatus === "no_show"
+                                disabled={loadingArrivalQR || (tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready" || c.readinessStatus === "no_show")))}
+                                className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all duration-300 flex items-center justify-center gap-3 active:scale-[0.98] shadow-xl
+                                    ${
+                                        tripStatus === "completed"
+                                            ? "bg-emerald-500 shadow-emerald-100 hover:bg-emerald-600"
+                                            // PERHATIKAN BARIS DI BAWAH INI JUGA: Harus sama dengan validasi disabled di atas
+                                            : tripStatus === "active" && (customers.length === 0 || !customers.every((c) => c.readinessStatus === "ready" || c.readinessStatus === "no_show"))
+                                            ? "bg-gray-300 shadow-none cursor-not-allowed"
+                                            : "bg-indigo-900 shadow-indigo-100 hover:bg-indigo-800"
+                                    }
+                                `}
+                            >
+                                {tripStatus === "completed" ? (
+                                    <>
+                                        <CheckCircle2 size={18} />
 										Kembali ke Beranda
 									</>
 								) : tripStatus === "arrived_destination" ? (
