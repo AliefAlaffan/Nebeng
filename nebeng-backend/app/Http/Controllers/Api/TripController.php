@@ -13,6 +13,8 @@ use App\Models\PickupPoint;
 use App\Services\Maps\OSRMService;
 use App\Services\Pricing\TripPricingService;
 use App\Services\NotificationService;
+use App\Models\User;
+use App\Models\RewardTransaction;
 
 class TripController extends Controller
 {
@@ -639,7 +641,7 @@ if ($request->tebengan_type === "Barang") {
             "/mitra/riwayat"
         );
 
-        foreach ($session->trip->orders as $order) {
+       foreach ($session->trip->orders as $order) {
             NotificationService::send(
                 $order->customer_id,
                 'Perjalanan Selesai',
@@ -647,6 +649,47 @@ if ($request->tebengan_type === "Barang") {
                 'trip',
                 "/customer/perjalanan/{$session->trip->id}"
             );
+
+            // ==========================================
+            // LOGIKA PENAMBAHAN POIN (DIPINDAH KE SINI)
+            // ==========================================
+            $customer = User::find($order->customer_id);
+            if ($customer) {
+                $points = 0;
+
+                switch ($session->trip->vehicle_type) {
+                    case 'motor':
+                        $points = 15;
+                        break;
+                    case 'mobil':
+                        $points = 25;
+                        break;
+                    case 'barang':
+                        $points = 20;
+                        break;
+                }
+
+                $customer->reward_points += $points;
+                $customer->save();
+
+                RewardTransaction::create([
+                    'user_id' => $customer->id,
+                    'type' => 'earn',
+                    'points' => $points,
+                    'description' => 'Poin dari penyelesaian trip #' . $session->trip->id
+                ]);
+
+                if ($points > 0) {
+                    NotificationService::send(
+                        $customer->id,
+                        'Dapat Poin Hadiah',
+                        "Kamu mendapat {$points} poin karena trip telah selesai.",
+                        'reward',
+                        '/customer/reward-points'
+                    );
+                }
+            }
+            // ==========================================
         }
 
         NotificationService::send(

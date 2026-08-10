@@ -48,30 +48,30 @@ export default function Riwayat() {
 					let icon = Package;
 
 					if (vehicleType === "motor") {
-						type = "Nebeng Motor";
-						category = "Motor";
-						icon = Bike;
-					} else if (vehicleType === "mobil") {
-						type = "Nebeng Mobil";
-						category = "Mobil";
-						icon = Car;
-					} else if (vehicleType?.includes("Barang")) {
-						type = vehicleType.replace("Barang-", "Nebeng ").replace("Motor", "Motor").replace("Mobil", "Mobil").replace("Kapal", "Kapal").replace("Pesawat", "Pesawat").replace("Kereta", "Kereta");
-
-						category = "Barang";
-
-						// =========================
-						// ICON BERDASARKAN VEHICLE
-						// =========================
-
-						if (vehicleType.includes("Motor")) {
-							icon = Bike;
-						} else if (vehicleType.includes("Mobil")) {
-							icon = Car;
-						} else {
-							icon = Package;
-						}
-					}
+                        type = "Nebeng Motor";
+                        category = "Motor";
+                        icon = Bike;
+                    } else if (vehicleType === "mobil") {
+                        type = "Nebeng Mobil";
+                        category = "Mobil";
+                        icon = Car;
+                    } else if (vehicleType === "Barang-Mobil") {
+                        type = "Nebeng Barang (Mobil)";
+                        category = "Barang";
+                        icon = Car;
+                    } else if (vehicleType === "Barang-Motor") {
+                        type = "Nebeng Barang (Motor)";
+                        category = "Barang";
+                        icon = Bike;
+                    } else if (vehicleType?.includes("Barang")) {
+                        type = "Nebeng Barang";
+                        category = "Barang";
+                        icon = Package;
+                    } else {
+                        type = "Nebeng";
+                        category = "Semua";
+                        icon = Package;
+                    }
 
 					const departureDateTime = `${order.trip?.departure_date}T${order.trip?.departure_time}`;
 

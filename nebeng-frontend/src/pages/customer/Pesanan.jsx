@@ -60,16 +60,27 @@ export default function Pesanan() {
 	}
 
 	const vehicleType = order.trip?.vehicle_type;
-	let Icon = Bike;
-	let title = "Nebeng Motor";
+    
+    // Tampilan default jika tidak ada yang cocok
+    let Icon = Package;
+    let title = "Nebeng";
 
-	if (vehicleType === "mobil") {
-		Icon = Car;
-		title = "Nebeng Mobil";
-	} else if (vehicleType === "barang") {
-		Icon = Package;
-		title = "Nebeng Barang";
-	}
+    if (vehicleType === "motor") {
+        Icon = Bike;
+        title = "Nebeng Motor";
+    } else if (vehicleType === "mobil") {
+        Icon = Car;
+        title = "Nebeng Mobil";
+    } else if (vehicleType === "Barang-Mobil") {
+        Icon = Car; // Pakai ikon mobil untuk barang bawaan mobil
+        title = "Nebeng Barang (Mobil)";
+    } else if (vehicleType === "Barang-Motor") {
+        Icon = Bike; // Pakai ikon motor untuk barang bawaan motor
+        title = "Nebeng Barang (Motor)";
+    } else if (vehicleType?.includes("Barang")) {
+        Icon = Package;
+        title = "Nebeng Barang";
+    }
 
 	const departureDateTime = `${order.trip?.departure_date}T${order.trip?.departure_time}`;
 

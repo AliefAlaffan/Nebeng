@@ -205,12 +205,23 @@ export default function PerjalananCustomer() {
 	};
 
 	// ================= DATA =================
-	const driver = {
-		name: trip?.mitra?.name || "Mitra",
-		photo: trip?.mitra?.avatar ? `http://127.0.0.1:8000/storage/${trip.mitra.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${trip?.mitra?.name || "Mitra"}`,
-		vehicle: trip?.vehicle_type || "-",
-		type: "Mitra Nebeng",
-	};
+	// ================= DATA =================
+    const getVehicleDisplay = (vType) => {
+        if (vType === "motor") return "Sepeda Motor";
+        if (vType === "mobil") return "Mobil Passenger";
+        if (vType === "Barang-Mobil") return "Mobil (Nebeng Barang)";
+        if (vType === "Barang-Motor") return "Motor (Nebeng Barang)";
+        return vType || "-";
+    };
+
+    const driver = {
+        name: trip?.mitra?.name || "Mitra",
+        photo: trip?.mitra?.avatar 
+            ? `http://127.0.0.1:8000/storage/${trip.mitra.avatar}` 
+            : `https://api.dicebear.com/7.x/avataaars/svg?seed=${trip?.mitra?.name || "Mitra"}`,
+        vehicle: getVehicleDisplay(trip?.vehicle_type),
+        type: trip?.vehicle_type?.includes("Barang") ? "Mitra Barang" : "Mitra Nebeng",
+    };
 
 	const pickupPoint = {
 		name: trip?.origin_point?.pos_name || "Pos Asal",

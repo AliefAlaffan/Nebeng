@@ -84,43 +84,7 @@ class OrderController extends Controller
             'message' => 'Halo 👋 pesanan trip #' . $order->id . ' sudah kami terima. Apakah pickup dan drop address sudah sesuai?'
         ]);
 
-        $user = auth()->user();
-
-        $points = 0;
-
-        switch ($trip->vehicle_type) {
-            case 'motor':
-                $points = 15;
-                break;
-
-            case 'mobil':
-                $points = 25;
-                break;
-
-            case 'barang':
-                $points = 20;
-                break;
-        }
-
-        $user->reward_points += $points;
-        $user->save();
-
-        RewardTransaction::create([
-            'user_id' => $user->id,
-            'type' => 'earn',
-            'points' => $points,
-            'description' => 'Poin dari pemesanan trip #' . $trip->id
-        ]);
-
-        if ($points > 0) {
-            NotificationService::send(
-                $user->id,
-                'Dapat Poin Hadiah',
-                "Kamu mendapat {$points} poin dari pemesanan ini.",
-                'reward',
-                '/customer/reward-points'
-            );
-        }
+        
 
         $trip->decrement('seat_available');
 
