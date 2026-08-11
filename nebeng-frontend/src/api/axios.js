@@ -1,7 +1,16 @@
 import axios from "axios";
 
+// PENTING: file .env di-gitignore, jadi VITE_API_BASE_URL sering tidak ke-set
+// di clone/environment baru. Sebelumnya fallback-nya adalah origin frontend
+// sendiri (window.location.origin), yaitu server Vite (http://localhost:5173),
+// BUKAN backend Laravel. Akibatnya semua request lewat instance axios ini
+// (dipakai di SOS, batalkan pesanan customer, batalkan pesanan mitra, dan
+// admin SOS monitor) selalu gagal dengan 404 dari Vite (bukan JSON dari
+// Laravel), sehingga error.response.data.message selalu undefined dan yang
+// muncul cuma pesan fallback generik di alert(). Fallback sekarang diarahkan
+// ke backend Laravel, konsisten dengan seluruh fetch() lain di aplikasi ini.
 const api = axios.create({
-	baseURL: import.meta.env.VITE_API_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "") + "/api",
+	baseURL: import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api",
 	withCredentials: true,
 	headers: {
 		Accept: "application/json",

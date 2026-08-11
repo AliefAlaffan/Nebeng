@@ -309,4 +309,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/admin/withdrawals/{id}/reject', [AdminBalanceController::class, 'reject']);
     Route::get('/admin/sos-alerts', [TripController::class, 'adminGetSosList']);
     Route::post('/admin/sos/{sosId}/rebuke', [TripController::class, 'adminRebukeMitra']);
+    Route::post('/admin/sos-alerts/{id}/resolve', [TripController::class, 'adminResolveSos']);
 });

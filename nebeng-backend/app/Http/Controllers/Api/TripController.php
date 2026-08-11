@@ -850,6 +850,10 @@ class TripController extends Controller
 
         $sos = SosLog::create([
             'trip_id' => $trip->id,
+            // Kolom customer_id di tabel sos_logs bersifat NOT NULL (foreign key),
+            // tapi sebelumnya tidak pernah diisi di sini -> selalu gagal dengan
+            // SQL error "customer_id cannot be null" saat SOS dikirim.
+            'customer_id' => $request->user()->id,
             'latitude' => $request->latitude,
             'longitude' => $request->longitude,
             'message' => 'Darurat! Pengguna mengirim sinyal SOS dari perjalanan.'
@@ -891,6 +895,20 @@ class TripController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Teguran berhasil dicatat dan dikirimkan kepada Mitra.'
+        ], 200);
+    }
+
+    public function adminResolveSos($id)
+    {
+        $sos = SosLog::findOrFail($id);
+
+        $sos->update([
+            'status' => 'resolved',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status SOS berhasil diperbarui menjadi selesai.'
         ], 200);
     }
 }
