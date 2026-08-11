@@ -3,6 +3,7 @@ import CustomerLayout from "../../components/dashboard/CustomerLayout";
 import { ChevronLeft, Bike, Car, Package, ArrowUp, MapPin, Users, Calendar, Compass, XCircle, Home, Loader2, Star, AlertTriangle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "../../api/axios";
+import AlertModal from "../../components/ui/AlertModal";
 
 export default function Pesanan() {
     const navigate = useNavigate();
@@ -12,6 +13,7 @@ export default function Pesanan() {
     const [loadingCancel, setLoadingCancel] = useState(false);
     const [order, setOrder] = useState(null);
     const [showCancelModal, setShowCancelModal] = useState(false); // State untuk mengontrol modal kustom
+    const [alertInfo, setAlertInfo] = useState({ show: false, type: "success", title: "", message: "" }); // Popup alert kustom (pengganti window.alert)
 
     useEffect(() => {
         const fetchOrder = async () => {
@@ -42,14 +44,23 @@ export default function Pesanan() {
         try {
             setLoadingCancel(true);
             const response = await axios.post(`/orders/${orderId}/cancel`);
-            
-            alert(response.data.message);
+
             setShowCancelModal(false);
-            window.location.reload(); 
+            setAlertInfo({
+                show: true,
+                type: "success",
+                title: "Pesanan Dibatalkan",
+                message: response.data.message,
+            });
 
         } catch (err) {
             console.error("Gagal membatalkan pesanan:", err);
-            alert(err.response?.data?.message || "Terjadi kesalahan saat membatalkan pesanan.");
+            setAlertInfo({
+                show: true,
+                type: "error",
+                title: "Gagal Membatalkan",
+                message: err.response?.data?.message || "Terjadi kesalahan saat membatalkan pesanan.",
+            });
         } finally {
             setLoadingCancel(false);
         }
@@ -278,6 +289,19 @@ export default function Pesanan() {
                     </div>
                 </div>
             )}
+
+            {/* POPUP ALERT KUSTOM (pengganti window.alert) */}
+            <AlertModal
+                show={alertInfo.show}
+                type={alertInfo.type}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                onClose={() => {
+                    const wasCancelSuccess = alertInfo.type === "success" && alertInfo.title === "Pesanan Dibatalkan";
+                    setAlertInfo((prev) => ({ ...prev, show: false }));
+                    if (wasCancelSuccess) window.location.reload();
+                }}
+            />
         </CustomerLayout>
     );
 }

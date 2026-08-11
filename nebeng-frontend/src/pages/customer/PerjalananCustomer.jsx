@@ -7,6 +7,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import QRCode from "react-qr-code";
 import SuccessPopup from "../../components/ui/SuccessPopup";
+import AlertModal from "../../components/ui/AlertModal";
 import axios from "../../api/axios";
 
 // ================= CUSTOM MAP ICONS =================
@@ -82,6 +83,9 @@ export default function PerjalananCustomer() {
     // --- State SOS Darurat ---
     const [showSosModal, setShowSosModal] = useState(false);
     const [loadingSos, setLoadingSos] = useState(false);
+
+    // --- State Popup Alert Kustom (pengganti window.alert bawaan browser) ---
+    const [alertInfo, setAlertInfo] = useState({ show: false, type: "success", title: "", message: "" });
 
     // --- Real-time driver position simulation ---
     const [driverPosition, setDriverPosition] = useState(null);
@@ -184,14 +188,23 @@ export default function PerjalananCustomer() {
         try {
             setLoadingCancel(true);
             const response = await axios.post(`/orders/${order.id}/cancel`);
-            
-            alert(response.data.message);
+
             setShowCancelModal(false);
-            navigate("/customer/dashboard"); 
+            setAlertInfo({
+                show: true,
+                type: "success",
+                title: "Pesanan Dibatalkan",
+                message: response.data.message,
+            });
 
         } catch (err) {
             console.error("Gagal membatalkan pesanan:", err);
-            alert(err.response?.data?.message || "Terjadi kesalahan saat membatalkan pesanan.");
+            setAlertInfo({
+                show: true,
+                type: "error",
+                title: "Gagal Membatalkan",
+                message: err.response?.data?.message || "Terjadi kesalahan saat membatalkan pesanan.",
+            });
         } finally {
             setLoadingCancel(false);
         }
@@ -204,11 +217,21 @@ export default function PerjalananCustomer() {
                 latitude: driverPosition ? driverPosition[0] : null,
                 longitude: driverPosition ? driverPosition[1] : null,
             });
-            alert(response.data.message);
             setShowSosModal(false); // Menutup modal setelah berhasil
+            setAlertInfo({
+                show: true,
+                type: "success",
+                title: "SOS Terkirim",
+                message: response.data.message,
+            });
         } catch (error) {
             console.error("Gagal kirim SOS:", error.response?.data || error.message);
-            alert(error.response?.data?.message || "Gagal mengirim SOS.");
+            setAlertInfo({
+                show: true,
+                type: "error",
+                title: "Gagal Mengirim SOS",
+                message: error.response?.data?.message || "Gagal mengirim SOS.",
+            });
         } finally {
             setLoadingSos(false);
         }
@@ -651,6 +674,19 @@ export default function PerjalananCustomer() {
                     </div>
                 </div>
             )}
+
+            {/* POPUP ALERT KUSTOM (pengganti window.alert) */}
+            <AlertModal
+                show={alertInfo.show}
+                type={alertInfo.type}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                onClose={() => {
+                    const wasCancelSuccess = alertInfo.type === "success" && alertInfo.title === "Pesanan Dibatalkan";
+                    setAlertInfo((prev) => ({ ...prev, show: false }));
+                    if (wasCancelSuccess) navigate("/customer/dashboard");
+                }}
+            />
 
             {/* Utility Styles */}
             <style>{`

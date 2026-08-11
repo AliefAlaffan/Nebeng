@@ -2,11 +2,18 @@ import React, { useState, useEffect } from "react";
 import AdminLayout from "../../components/dashboard/AdminLayout"; // Sesuaikan path layout admin kamu
 import { ShieldAlert, MapPin, Clock, CheckCircle2, AlertTriangle, PhoneCall, Loader2 } from "lucide-react";
 import axios from "../../api/axios";
+import ConfirmModal from "../../components/ui/ConfirmModal";
+import AlertModal from "../../components/ui/AlertModal";
 
 export default function AdminSosMonitor() {
     const [sosList, setSosList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedSos, setSelectedSos] = useState(null);
+
+    // --- Popup kustom (pengganti window.confirm & window.alert bawaan browser) ---
+    const [confirmTargetId, setConfirmTargetId] = useState(null); // id SOS yang mau ditandai selesai
+    const [resolving, setResolving] = useState(false);
+    const [alertInfo, setAlertInfo] = useState({ show: false, type: "success", title: "", message: "" });
 
     const fetchSosData = async () => {
         try {
@@ -25,15 +32,30 @@ export default function AdminSosMonitor() {
         return () => clearInterval(interval);
     }, []);
 
-    const handleResolveSos = async (id) => {
-        if (!window.confirm("Tandai darurat ini sebagai sudah diselesaikan/ditangani?")) return;
+    const handleResolveSos = async () => {
+        if (!confirmTargetId) return;
         try {
-            await axios.post(`/admin/sos-alerts/${id}/resolve`);
-            alert("Status SOS berhasil diperbarui.");
+            setResolving(true);
+            await axios.post(`/admin/sos-alerts/${confirmTargetId}/resolve`);
+            setConfirmTargetId(null);
+            setAlertInfo({
+                show: true,
+                type: "success",
+                title: "Status Diperbarui",
+                message: "Status SOS berhasil diperbarui.",
+            });
             fetchSosData();
         } catch (err) {
             console.error("Gagal memperbarui status:", err);
-            alert("Terjadi kesalahan saat memperbarui status.");
+            setConfirmTargetId(null);
+            setAlertInfo({
+                show: true,
+                type: "error",
+                title: "Gagal Memperbarui",
+                message: err.response?.data?.message || "Terjadi kesalahan saat memperbarui status.",
+            });
+        } finally {
+            setResolving(false);
         }
     };
 
@@ -104,8 +126,8 @@ export default function AdminSosMonitor() {
                                 </div>
 
                                 <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
-                                    <a
-                                        href={`https://www.google.com/maps?q=${sos.latitude},${sos.longitude}`}
+                                    
+                                        <a href={`https://www.google.com/maps?q=${sos.latitude},${sos.longitude}`}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="flex-1 py-2.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 rounded-xl text-center text-xs font-black uppercase tracking-wider transition-all"
@@ -113,7 +135,7 @@ export default function AdminSosMonitor() {
                                         Buka Peta
                                     </a>
                                     <button
-                                        onClick={() => handleResolveSos(sos.id)}
+                                        onClick={() => setConfirmTargetId(sos.id)}
                                         className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-center text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-100"
                                     >
                                         Selesai
@@ -124,6 +146,26 @@ export default function AdminSosMonitor() {
                     </div>
                 )}
             </div>
+
+            {/* POPUP KONFIRMASI (pengganti window.confirm) */}
+            <ConfirmModal
+                show={!!confirmTargetId}
+                title="Selesaikan Darurat"
+                message="Tandai darurat ini sebagai sudah diselesaikan/ditangani?"
+                confirmText="Ya, Tandai Selesai"
+                loading={resolving}
+                onConfirm={handleResolveSos}
+                onCancel={() => setConfirmTargetId(null)}
+            />
+
+            {/* POPUP ALERT KUSTOM (pengganti window.alert) */}
+            <AlertModal
+                show={alertInfo.show}
+                type={alertInfo.type}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                onClose={() => setAlertInfo((prev) => ({ ...prev, show: false }))}
+            />
         </AdminLayout>
     );
 }
