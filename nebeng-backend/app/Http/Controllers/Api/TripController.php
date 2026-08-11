@@ -841,19 +841,24 @@ class TripController extends Controller
 
     public function sendSos(Request $request, $tripId)
     {
-        $user = $request->user();
+        $request->validate([
+            'latitude' => 'nullable',
+            'longitude' => 'nullable',
+        ]);
 
-        // Simpan data SOS ke database
-        SosLog::create([
-            'trip_id' => $tripId,
-            'user_id' => $user->id,
+        $trip = Trip::findOrFail($tripId);
+
+        $sos = SosLog::create([
+            'trip_id' => $trip->id,
             'latitude' => $request->latitude,
             'longitude' => $request->longitude,
-            'status' => 'pending',
+            'message' => 'Darurat! Pengguna mengirim sinyal SOS dari perjalanan.'
         ]);
 
         return response()->json([
-            'message' => 'Sinyal darurat (SOS) berhasil dikirim ke Admin pusat.'
+            'status' => 'success',
+            'message' => 'SOS berhasil dikirim ke pusat!',
+            'data' => $sos
         ], 200);
     }
 

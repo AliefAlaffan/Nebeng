@@ -197,20 +197,18 @@ export default function PerjalananCustomer() {
         }
     };
 
-    // --- Fungsi Kirim Sinyal SOS (Terhubung ke TripController) ---
     const handleSendSos = async () => {
         try {
-            setLoadingSos(true);
+            setLoadingSos(true); // Opsional: jika ingin mengaktifkan state loading di modal SOS
             const response = await axios.post(`/trips/${tripId}/sos`, {
                 latitude: driverPosition ? driverPosition[0] : null,
                 longitude: driverPosition ? driverPosition[1] : null,
             });
-
-            alert(response.data.message || "Sinyal darurat (SOS) berhasil dikirim ke Admin pusat.");
-            setShowSosModal(false);
-        } catch (err) {
-            console.error("Gagal mengirim SOS:", err);
-            alert(err.response?.data?.message || "Gagal mengirim sinyal SOS.");
+            alert(response.data.message);
+            setShowSosModal(false); // Menutup modal setelah berhasil
+        } catch (error) {
+            console.error("Gagal kirim SOS:", error.response?.data || error.message);
+            alert(error.response?.data?.message || "Gagal mengirim SOS.");
         } finally {
             setLoadingSos(false);
         }

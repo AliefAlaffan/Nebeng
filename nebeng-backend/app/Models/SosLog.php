@@ -2,9 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class SosLog extends Model // Pastikan ini SosLog
+class SosLog extends Model
 {
-    protected $fillable = ['trip_id', 'user_id', 'latitude', 'longitude', 'status'];
+    use HasFactory;
+
+    protected $fillable = [
+        'trip_id',
+        'latitude',
+        'longitude',
+        'message'
+    ];
+
+    public function trip()
+    {
+        return $this->belongsTo(Trip::class);
+    }
 }
