@@ -22,6 +22,10 @@ class Order extends Model
         'payment_proof',
         'payment_status',
         'readiness_status',
+        'refund_status',
+        'refund_percentage',
+        'penalty_amount',
+        'cancelled_at',
     ];
 
     public function trip()

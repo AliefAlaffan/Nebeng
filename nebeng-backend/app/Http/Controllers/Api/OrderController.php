@@ -31,6 +31,12 @@ class OrderController extends Controller
 
         $trip = Trip::findOrFail($request->trip_id);
 
+        if ($request->payment_method === 'cash' && auth()->user()->late_cancel_count >= 3) {
+            return response()->json([
+                'message' => 'Karena riwayat pembatalan mendadak, akun Anda saat ini hanya bisa memesan dengan pembayaran QRIS.'
+            ], 400);
+        }
+
         // Cek apakah customer sudah punya pesanan aktif yang BENAR-BENAR VALID/LUNAS (bukan yang mangkrak belum bayar)
         $existingOrder = Order::where('trip_id', $trip->id)
             ->where('customer_id', auth()->id())
@@ -301,7 +307,7 @@ class OrderController extends Controller
     public function cancelOrder(Request $request, $id)
     {
         $order = Order::with('trip')->findOrFail($id);
-        
+
         $departureTime = Carbon::parse($order->trip->departure_time);
         $now = Carbon::now();
         $hoursDifference = $now->diffInHours($departureTime, false);
@@ -313,14 +319,36 @@ class OrderController extends Controller
             ], 400);
         }
 
-        // Jika pembayaran Tunai
+        // ================= PEMBAYARAN TUNAI =================
         if ($order->payment_method === 'cash') {
+
+            // Cash belum pernah dibayar di muka, jadi tidak ada uang yang
+            // bisa "hangus". Sebagai gantinya, pembatalan mepet waktu (<3 jam)
+            // dicatat sebagai pelanggaran (strike) pada akun customer, karena
+            // mitra sudah terlanjur mengunci kursi/waktu untuk mereka.
+            $isLateCancel = $hoursDifference < 3;
+
             $order->update([
                 'status' => 'cancelled',
-                'refund_status' => 'not_applicable'
+                'refund_status' => 'not_applicable',
+                'penalty_amount' => $isLateCancel ? (int) round($order->price * 0.2) : 0,
+                'cancelled_at' => $now,
             ]);
-            
+
             \App\Models\OrderQrSession::where('order_id', $id)->delete();
+
+            if ($isLateCancel) {
+                $customer = User::find($order->customer_id);
+                if ($customer) {
+                    $customer->increment('late_cancel_count');
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'rule' => 'cash_late_cancel_penalty',
+                    'message' => 'Pesanan tunai dibatalkan. Karena dilakukan kurang dari 3 jam sebelum keberangkatan, ini tercatat sebagai pembatalan mendadak. Jika hal ini berulang, akun Anda akan diwajibkan membayar via QRIS di muka untuk pesanan berikutnya.'
+                ], 200);
+            }
 
             return response()->json([
                 'success' => true,
@@ -329,51 +357,65 @@ class OrderController extends Controller
             ], 200);
         }
 
-        // Jika pembayaran QRIS (Sistem Bertingkat)
+        // ================= PEMBAYARAN QRIS (Sistem Bertingkat) =================
         if ($hoursDifference >= 12) {
-            // Tier 1: > 12 jam (Refund 100%)
-            $order->update([
-                'status' => 'cancelled',
-                'refund_status' => 'pending_100_percent'
-            ]);
-            
-            \App\Models\OrderQrSession::where('order_id', $id)->delete();
-
-            return response()->json([
-                'success' => true,
-                'rule' => 'refund_100',
-                'message' => 'Pembatalan berhasil. Karena dilakukan lebih dari 12 jam sebelum keberangkatan, Anda berhak mendapatkan refund 100% dari mitra.'
-            ], 200);
-
+            $percentage = 100;
+            $rule = 'refund_100';
+            $refundStatus = 'pending_100_percent';
+            $message = 'Pembatalan berhasil. Karena dilakukan lebih dari 12 jam sebelum keberangkatan, Anda berhak mendapatkan refund 100% dari mitra.';
         } elseif ($hoursDifference >= 3) {
-            // Tier 2: 3 s.d 12 jam (Refund 50%)
-            $order->update([
-                'status' => 'cancelled',
-                'refund_status' => 'pending_50_percent'
-            ]);
-            
-            \App\Models\OrderQrSession::where('order_id', $id)->delete();
-
-            return response()->json([
-                'success' => true,
-                'rule' => 'refund_50',
-                'message' => 'Pembatalan berhasil. Karena dilakukan antara 3 hingga 12 jam sebelum keberangkatan, Anda berhak mendapatkan refund 50% dari mitra.'
-            ], 200);
-
+            $percentage = 50;
+            $rule = 'refund_50';
+            $refundStatus = 'pending_50_percent';
+            $message = 'Pembatalan berhasil. Karena dilakukan antara 3 hingga 12 jam sebelum keberangkatan, Anda berhak mendapatkan refund 50% dari mitra.';
         } else {
-            // Tier 3: < 3 jam (Hangus / No Refund)
-            $order->update([
-                'status' => 'cancelled',
-                'refund_status' => 'non_refundable'
-            ]);
-
-            \App\Models\OrderQrSession::where('order_id', $id)->delete();
-
-            return response()->json([
-                'success' => true,
-                'rule' => 'no_refund',
-                'message' => 'Pembatalan berhasil. Karena dilakukan kurang dari 3 jam sebelum keberangkatan, dana QRIS dinyatakan hangus.'
-            ], 200);
+            $percentage = 0;
+            $rule = 'no_refund';
+            $refundStatus = 'non_refundable';
+            $message = 'Pembatalan berhasil. Karena dilakukan kurang dari 3 jam sebelum keberangkatan, dana QRIS dinyatakan hangus.';
         }
+
+        $refundAmount = (int) round($order->price * $percentage / 100);
+
+        // Jika mitra SUDAH mengonfirmasi pembayaran (saldo mitra sudah
+        // ditambah di confirmPayment()), maka bagian yang wajib direfund
+        // harus otomatis ditarik kembali dari saldo mitra saat itu juga.
+        // Sebelumnya ini tidak pernah terjadi -> saldo mitra tetap penuh
+        // walau customer sudah "dijanjikan" refund, sehingga refund tidak
+        // pernah benar-benar bisa diproses admin.
+        if ($order->payment_status === 'paid' && $refundAmount > 0) {
+            $mitraId = $order->trip->mitra_id;
+
+            $balance = DriverBalance::firstOrCreate(
+                ['user_id' => $mitraId],
+                ['balance' => 0]
+            );
+            $balance->decrement('balance', $refundAmount);
+
+            BalanceTransaction::create([
+                'user_id' => $mitraId,
+                'order_id' => $order->id,
+                'type' => 'debit',
+                'amount' => $refundAmount,
+                'description' => "Potongan saldo untuk refund {$percentage}% pembatalan order #{$order->id}",
+            ]);
+        }
+
+        $order->update([
+            'status' => 'cancelled',
+            'refund_status' => $refundStatus,
+            'refund_percentage' => $percentage,
+            'cancelled_at' => $now,
+        ]);
+
+        \App\Models\OrderQrSession::where('order_id', $id)->delete();
+
+        return response()->json([
+            'success' => true,
+            'rule' => $rule,
+            'refund_percentage' => $percentage,
+            'refund_amount' => $refundAmount,
+            'message' => $message,
+        ], 200);
     }
 }
