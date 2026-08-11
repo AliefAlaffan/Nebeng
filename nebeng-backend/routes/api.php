@@ -296,6 +296,8 @@ Route::middleware(['auth:sanctum','role:customer' ])->group(function () {
     Route::post('/item-orders', [ItemOrderController::class,'store']);
 
     Route::post('/payment', [PaymentController::class, 'createPayment']);
+
+    Route::post('/orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

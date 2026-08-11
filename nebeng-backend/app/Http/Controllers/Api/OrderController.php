@@ -15,6 +15,7 @@ use App\Models\BalanceTransaction;
 use App\Events\NewOrderNotification;
 use Illuminate\Support\Facades\Storage;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 
 class OrderController extends Controller
 {
@@ -294,6 +295,85 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Gagal memproses permintaan: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function cancelOrder(Request $request, $id)
+    {
+        $order = Order::with('trip')->findOrFail($id);
+        
+        $departureTime = Carbon::parse($order->trip->departure_time);
+        $now = Carbon::now();
+        $hoursDifference = $now->diffInHours($departureTime, false);
+
+        if ($hoursDifference < 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan sudah tidak dapat dibatalkan karena waktu keberangkatan telah tiba/lewat.'
+            ], 400);
+        }
+
+        // Jika pembayaran Tunai
+        if ($order->payment_method === 'cash') {
+            $order->update([
+                'status' => 'cancelled',
+                'refund_status' => 'not_applicable'
+            ]);
+            
+            \App\Models\OrderQrSession::where('order_id', $id)->delete();
+
+            return response()->json([
+                'success' => true,
+                'rule' => 'cash_cancelled',
+                'message' => 'Pesanan tunai berhasil dibatalkan.'
+            ], 200);
+        }
+
+        // Jika pembayaran QRIS (Sistem Bertingkat)
+        if ($hoursDifference >= 12) {
+            // Tier 1: > 12 jam (Refund 100%)
+            $order->update([
+                'status' => 'cancelled',
+                'refund_status' => 'pending_100_percent'
+            ]);
+            
+            \App\Models\OrderQrSession::where('order_id', $id)->delete();
+
+            return response()->json([
+                'success' => true,
+                'rule' => 'refund_100',
+                'message' => 'Pembatalan berhasil. Karena dilakukan lebih dari 12 jam sebelum keberangkatan, Anda berhak mendapatkan refund 100% dari mitra.'
+            ], 200);
+
+        } elseif ($hoursDifference >= 3) {
+            // Tier 2: 3 s.d 12 jam (Refund 50%)
+            $order->update([
+                'status' => 'cancelled',
+                'refund_status' => 'pending_50_percent'
+            ]);
+            
+            \App\Models\OrderQrSession::where('order_id', $id)->delete();
+
+            return response()->json([
+                'success' => true,
+                'rule' => 'refund_50',
+                'message' => 'Pembatalan berhasil. Karena dilakukan antara 3 hingga 12 jam sebelum keberangkatan, Anda berhak mendapatkan refund 50% dari mitra.'
+            ], 200);
+
+        } else {
+            // Tier 3: < 3 jam (Hangus / No Refund)
+            $order->update([
+                'status' => 'cancelled',
+                'refund_status' => 'non_refundable'
+            ]);
+
+            \App\Models\OrderQrSession::where('order_id', $id)->delete();
+
+            return response()->json([
+                'success' => true,
+                'rule' => 'no_refund',
+                'message' => 'Pembatalan berhasil. Karena dilakukan kurang dari 3 jam sebelum keberangkatan, dana QRIS dinyatakan hangus.'
+            ], 200);
         }
     }
 }
