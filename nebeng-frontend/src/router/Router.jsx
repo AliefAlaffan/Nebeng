@@ -32,6 +32,7 @@ const AturPasswordAdmin = lazy(() => import("../pages/customer/AturPassword"));
 const AturHarga = lazy(() => import("../pages/admin/PricingManagement"));
 const KelolaReward = lazy(() => import("../pages/admin/KelolaReward"));
 const PenarikanSaldo = lazy(() => import("../pages/admin/PenarikanSaldo"));
+const AdminSosMonitor = lazy(() => import("../pages/admin/AdminSosMonitor"));
 
 /* CUSTOMER */
 const DashboardCustomer = lazy(() => import("../pages/customer/Dashboard"));
@@ -184,6 +185,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="admin">
 						<KelolaReward />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/admin/sos-monitor"
+				element={
+					<ProtectedRoute role="admin">
+						<AdminSosMonitor />
 					</ProtectedRoute>
 				}
 			/>

@@ -1,7 +1,7 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
-import { LayoutDashboard, Users, User, ClipboardList, RefreshCcw, FileText, LogOut, ChevronRight, X, Bike, ShieldCheck, Settings, DollarSign, Gift, Wallet } from "lucide-react";
+import { LayoutDashboard, Users, User, ClipboardList, RefreshCcw, FileText, LogOut, ChevronRight, X, Bike, ShieldCheck, Settings, DollarSign, Gift, Wallet, ShieldAlert } from "lucide-react";
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 	const location = useLocation();
@@ -192,6 +192,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 							<div className="flex items-center gap-4">
 								<Wallet size={20} />
 								<span className="text-sm font-bold">Penarikan Saldo</span>
+							</div>
+							<ChevronRight size={16} />
+						</NavLink>
+
+						<NavLink to="/admin/sos-monitor" onClick={() => setSidebarOpen(false)} className={menuStyle}>
+							<div className="flex items-center gap-4">
+								<ShieldAlert size={20} />
+								<span className="text-sm font-bold">Pemantauan SOS</span>
 							</div>
 							<ChevronRight size={16} />
 						</NavLink>

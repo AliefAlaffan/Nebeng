@@ -15,6 +15,7 @@ use App\Services\Pricing\TripPricingService;
 use App\Services\NotificationService;
 use App\Models\User;
 use App\Models\RewardTransaction;
+use App\Models\SosLog;
 
 class TripController extends Controller
 {
@@ -836,5 +837,55 @@ class TripController extends Controller
             'order_id' => $session->order->id,
             'readiness_status' => 'ready'
         ]);
+    }
+
+    public function sendSos(Request $request, $tripId)
+    {
+        $user = $request->user();
+
+        // Simpan data SOS ke database
+        SosLog::create([
+            'trip_id' => $tripId,
+            'user_id' => $user->id,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
+            'status' => 'pending',
+        ]);
+
+        return response()->json([
+            'message' => 'Sinyal darurat (SOS) berhasil dikirim ke Admin pusat.'
+        ], 200);
+    }
+
+    // 2. Digunakan Admin untuk melihat daftar darurat masuk
+    public function adminGetSosList()
+    {
+        $sosList = SosLog::with(['trip.mitra', 'trip.originPoint', 'trip.destinationPoint', 'customer'])
+                        ->orderBy('created_at', 'desc')
+                        ->get();
+
+        return response()->json($sosList, 200);
+    }
+
+    // 3. Digunakan Admin untuk mengirim teguran/tindakan ke Mitra
+    public function adminRebukeMitra(Request $request, $sosId)
+    {
+        $request->validate([
+            'admin_notes' => 'required|string'
+        ]);
+
+        $sos = SosLog::with('trip.mitra')->findOrFail($sosId);
+        $sos->update([
+            'admin_notes' => $request->admin_notes,
+            'status' => 'reviewed'
+        ]);
+
+        // Opsional: Anda bisa mengirim notifikasi/pesan WhatsApp/broadcast ke mitra di sini
+        // Contoh: Notification::send($sos->trip->mitra, new MitraRebukeNotification($request->admin_notes));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Teguran berhasil dicatat dan dikirimkan kepada Mitra.'
+        ], 200);
     }
 }

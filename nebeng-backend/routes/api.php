@@ -298,6 +298,8 @@ Route::middleware(['auth:sanctum','role:customer' ])->group(function () {
     Route::post('/payment', [PaymentController::class, 'createPayment']);
 
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
+
+    Route::post('/trips/{tripId}/sos', [TripController::class, 'sendSos']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -305,4 +307,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/withdrawals', [AdminBalanceController::class, 'allWithdrawals']);
     Route::post('/admin/withdrawals/{id}/approve', [AdminBalanceController::class, 'approve']);
     Route::post('/admin/withdrawals/{id}/reject', [AdminBalanceController::class, 'reject']);
+    Route::get('/admin/sos-alerts', [TripController::class, 'adminGetSosList']);
+    Route::post('/admin/sos/{sosId}/rebuke', [TripController::class, 'adminRebukeMitra']);
 });

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, MessageCircle, Navigation, Clock3, ChevronUp, ChevronDown, ShieldAlert, Car, MapPin, Crosshair, AlertTriangle, Loader2 } from "lucide-react";
+import { ChevronLeft, MessageCircle, Navigation, Clock3, ChevronUp, ChevronDown, ShieldAlert, Car, MapPin, Crosshair, AlertTriangle, Loader2, PhoneCall } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -78,6 +78,10 @@ export default function PerjalananCustomer() {
     // --- State Pembatalan ---
     const [loadingCancel, setLoadingCancel] = useState(false);
     const [showCancelModal, setShowCancelModal] = useState(false);
+
+    // --- State SOS Darurat ---
+    const [showSosModal, setShowSosModal] = useState(false);
+    const [loadingSos, setLoadingSos] = useState(false);
 
     // --- Real-time driver position simulation ---
     const [driverPosition, setDriverPosition] = useState(null);
@@ -190,6 +194,25 @@ export default function PerjalananCustomer() {
             alert(err.response?.data?.message || "Terjadi kesalahan saat membatalkan pesanan.");
         } finally {
             setLoadingCancel(false);
+        }
+    };
+
+    // --- Fungsi Kirim Sinyal SOS (Terhubung ke TripController) ---
+    const handleSendSos = async () => {
+        try {
+            setLoadingSos(true);
+            const response = await axios.post(`/trips/${tripId}/sos`, {
+                latitude: driverPosition ? driverPosition[0] : null,
+                longitude: driverPosition ? driverPosition[1] : null,
+            });
+
+            alert(response.data.message || "Sinyal darurat (SOS) berhasil dikirim ke Admin pusat.");
+            setShowSosModal(false);
+        } catch (err) {
+            console.error("Gagal mengirim SOS:", err);
+            alert(err.response?.data?.message || "Gagal mengirim sinyal SOS.");
+        } finally {
+            setLoadingSos(false);
         }
     };
 
@@ -360,7 +383,12 @@ export default function PerjalananCustomer() {
                     </div>
 
                     <div className="absolute top-24 right-6 z-[1000]">
-                        <button className="bg-white border-2 border-red-500 text-red-500 rounded-2xl px-4 py-2 text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-red-500 hover:text-white transition-all">SOS</button>
+                        <button 
+                            onClick={() => setShowSosModal(true)}
+                            className="bg-white border-2 border-red-500 text-red-500 rounded-2xl px-4 py-2 text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-red-500 hover:text-white transition-all animate-pulse"
+                        >
+                            SOS
+                        </button>
                     </div>
                 </div>
 
@@ -461,7 +489,7 @@ export default function PerjalananCustomer() {
                             </div>
                         )}
 
-						{/* TOMBOL BATALKAN PESANAN (Hanya muncul jika perjalanan belum selesai) */}
+                        {/* TOMBOL BATALKAN PESANAN (Hanya muncul jika perjalanan belum selesai) */}
                         {tripStatus !== "completed" && (
                             <div className="pt-0">
                                 <button
@@ -486,15 +514,23 @@ export default function PerjalananCustomer() {
                             </div>
                         )}
 
-                        {/* SAFETY */}
-                        <div className="bg-red-50 border border-red-100 rounded-3xl p-4 flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
-                                <ShieldAlert size={18} className="text-red-600" />
+                        {/* SAFETY & SOS TRIGGER CARD */}
+                        <div className="bg-red-50 border border-red-100 rounded-3xl p-4 flex items-center justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0 mt-1">
+                                    <ShieldAlert size={18} className="text-red-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-red-700 text-sm uppercase tracking-wide">Fitur Keamanan</h3>
+                                    <p className="text-xs text-red-500 mt-1 leading-relaxed">Tekan tombol darurat untuk mengirim sinyal ke admin.</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="font-black text-red-700 text-sm uppercase tracking-wide">Fitur Keamanan</h3>
-                                <p className="text-xs text-red-500 mt-1 leading-relaxed">Gunakan tombol SOS apabila terjadi keadaan darurat selama perjalanan berlangsung.</p>
-                            </div>
+                            <button
+                                onClick={() => setShowSosModal(true)}
+                                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-md shrink-0 transition-all"
+                            >
+                                SOS
+                            </button>
                         </div>
 
                         {/* ACTION BUTTON */}
@@ -519,6 +555,49 @@ export default function PerjalananCustomer() {
                     </div>
                 </div>
             </div>
+
+            {/* CUSTOM MODAL KONFIRMASI SOS DARURAT */}
+            {showSosModal && (
+                <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border border-red-100 space-y-6 text-center">
+                        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner animate-bounce">
+                            <ShieldAlert size={32} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <h3 className="text-2xl font-black text-red-600 tracking-tight">Kirim Sinyal Darurat (SOS)</h3>
+                            <p className="text-xs text-gray-600 leading-relaxed font-medium">
+                                Sinyal darurat beserta lokasi Anda akan langsung dikirimkan ke Admin pusat agar Admin dapat segera menegur atau menghubungi mitra yang bertugas.
+                            </p>
+                        </div>
+
+                        <div className="bg-red-50 rounded-2xl p-4 border border-red-100 text-left space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-bold text-red-700">
+                                <PhoneCall size={14} />
+                                <span>Darurat Mendesak / Polisi:</span>
+                            </div>
+                            <p className="text-sm font-black text-red-800">Hotline Darurat: 112</p>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setShowSosModal(false)}
+                                disabled={loadingSos}
+                                className="flex-1 py-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-xs uppercase tracking-wider transition-all"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleSendSos}
+                                disabled={loadingSos}
+                                className="flex-1 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {loadingSos ? <Loader2 className="animate-spin" size={16} /> : "Kirim ke Admin"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* CUSTOM MODAL KONFIRMASI PEMBATALAN */}
             {showCancelModal && (

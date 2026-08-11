@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sos_logs', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
-        });
+        $table->id();
+        $table->foreignId('trip_id')->constrained()->onDelete('cascade');
+        $table->foreignId('customer_id')->constrained('users')->onDelete('cascade');
+        $table->string('status')->default('pending'); // pending, reviewed, resolved
+        $table->decimal('latitude', 10, 8)->nullable();
+        $table->decimal('longitude', 11, 8)->nullable();
+        $table->text('admin_notes')->nullable();
+        $table->timestamps();
+    });
     }
 
     /**
