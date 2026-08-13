@@ -29,10 +29,6 @@ class OrderController extends Controller
             'payment_method' => 'required|in:cash,qris,ewallet' 
         ]);
 
-        // Customer yang sudah 3x+ membatalkan pesanan cash secara mendadak
-        // (<3 jam sebelum keberangkatan) wajib pakai QRIS (bayar di muka)
-        // untuk pesanan berikutnya, supaya mitra tidak terus menanggung
-        // risiko kursi kosong tanpa kompensasi.
         if ($request->payment_method === 'cash' && $request->user()->late_cancel_count >= 3) {
             return response()->json([
                 'message' => 'Karena riwayat pembatalan mendadak, akun Anda saat ini hanya bisa memesan dengan pembayaran QRIS.'
@@ -41,11 +37,9 @@ class OrderController extends Controller
 
         $trip = Trip::findOrFail($request->trip_id);
 
-        // Cek apakah customer sudah punya pesanan aktif yang BENAR-BENAR VALID/LUNAS (bukan yang mangkrak belum bayar)
         $existingOrder = Order::where('trip_id', $trip->id)
             ->where('customer_id', auth()->id())
             ->where(function($query) {
-                // Blokir jika status pembayaran sudah paid atau waiting confirmation (artinya sudah pernah diproses bayar)
                 $query->where('payment_status', 'paid')
                       ->orWhere('payment_status', 'waiting_confirmation');
             })
@@ -63,14 +57,12 @@ class OrderController extends Controller
             ], 400);
         }
 
-        // Cek jika ada order sebelumnya yang mangkrak (unpaid), timpa atau gunakan kembali agar tidak menumpuk
         $pendingOrder = Order::where('trip_id', $trip->id)
             ->where('customer_id', auth()->id())
             ->where('payment_status', 'unpaid')
             ->first();
 
         if ($pendingOrder) {
-            // Update data order yang mangkrak sebelumnya
             $pendingOrder->update([
                 'pickup_address' => $request->pickup_address,
                 'drop_address' => $request->drop_address,
@@ -78,7 +70,6 @@ class OrderController extends Controller
             ]);
             $order = $pendingOrder;
         } else {
-            // Buat order baru dengan status awal masih unpaid & status pending (belum mengurangi seat dulu sebelum dibayar/diproses)
             $order = Order::create([
                 'trip_id' => $trip->id,
                 'customer_id' => auth()->id(),
@@ -86,7 +77,7 @@ class OrderController extends Controller
                 'drop_address' => $request->drop_address,
                 'price' => $trip->price,
                 'payment_method' => $request->payment_method, 
-                'status' => 'pending', // Belum aktif penuh sebelum dibayar
+                'status' => 'pending',
                 'payment_status' => 'unpaid'
             ]);
         }
@@ -160,7 +151,6 @@ class OrderController extends Controller
 
         $path = $request->file('payment_proof')->store('payment_proofs', 'public');
 
-        // BARU DI SINI PESANAN RESMI AKTIF & KURSI DIKURANGI SETELAH BUKTI DI-UPLOAD
         $order->update([
             'payment_proof' => $path,
             'payment_status' => 'waiting_confirmation',
@@ -233,7 +223,6 @@ class OrderController extends Controller
 
         $order->update(['payment_status' => 'paid']);
 
-        // Jika metode cash, status dan pengurangan kursi baru terjadi saat konfirmasi atau saat pesanan dibuat (sesuaikan kebutuhan cash)
         if ($order->payment_method === 'cash' && $order->status !== 'completed') {
             $order->update(['status' => 'completed']);
             $order->trip->decrement('seat_available');
@@ -282,17 +271,12 @@ class OrderController extends Controller
     public function markAsNoShow($id)
     {
         try {
-            // Cari order berdasarkan ID
             $order = \App\Models\Order::findOrFail($id);
 
-            // Pastikan status order masih dalam tahap menunggu (sesuaikan dengan status enum kamu)
-            // Update readiness_status atau status utama menjadi no_show
             $order->update([
                 'readiness_status' => 'no_show',
-                // 'status' => 'cancelled' // Buka komentar ini jika status utama juga perlu diubah
             ]);
 
-            // Hapus sesi QR yang menggantung agar tidak mengunci sistem
             \App\Models\OrderQrSession::where('order_id', $id)->delete();
 
             return response()->json([
@@ -311,6 +295,10 @@ class OrderController extends Controller
     public function cancelOrder(Request $request, $id)
     {
         $order = Order::with('trip')->findOrFail($id);
+
+        // simpan dulu sebelum status order diubah — untuk tahu apakah kursi
+        // sudah sempat "terpakai" (dikurangi) waktu order ini lunas dulu
+        $wasSeatReserved = $order->status === 'completed';
         
         $departureTime = Carbon::parse($order->trip->departure_date . ' ' . $order->trip->departure_time);
         $now = Carbon::now();
@@ -326,12 +314,6 @@ class OrderController extends Controller
         // ================= PEMBAYARAN TUNAI =================
         if ($order->payment_method === 'cash') {
 
-            // Cash belum pernah dibayar di muka, jadi tidak ada uang yang
-            // bisa "hangus". Sebagai gantinya, pembatalan mepet waktu (<3 jam)
-            // dicatat sebagai pelanggaran (strike) pada akun customer, karena
-            // mitra sudah terlanjur mengunci kursi/waktu untuk mereka:
-            // strike ke-3 -> wajib QRIS untuk pesanan berikutnya (lihat store())
-            // strike ke-5 -> akun otomatis disuspend (status = blocked)
             $isLateCancel = $hoursDifference < 3;
 
             $order->update([
@@ -340,6 +322,11 @@ class OrderController extends Controller
                 'penalty_amount' => $isLateCancel ? (int) round($order->price * 0.2) : 0,
                 'cancelled_at' => $now,
             ]);
+
+            // KEMBALIKAN KURSI kalau sebelumnya sudah terpakai
+            if ($wasSeatReserved && $order->trip) {
+                $order->trip->increment('seat_available');
+            }
 
             \App\Models\OrderQrSession::where('order_id', $id)->delete();
 
@@ -393,10 +380,6 @@ class OrderController extends Controller
 
         $refundAmount = (int) round($order->price * $percentage / 100);
 
-        // Jika mitra SUDAH mengonfirmasi pembayaran (saldo mitra sudah
-        // ditambah di confirmPayment()), bagian yang wajib direfund harus
-        // otomatis ditarik kembali dari saldo mitra saat itu juga - supaya
-        // "janji refund" ini benar-benar tercatat, bukan cuma status kosong.
         if ($order->payment_status === 'paid' && $refundAmount > 0) {
             $mitraId = $order->trip->mitra_id;
 
@@ -421,6 +404,11 @@ class OrderController extends Controller
             'refund_percentage' => $percentage,
             'cancelled_at' => $now,
         ]);
+
+        // KEMBALIKAN KURSI kalau sebelumnya sudah terpakai
+        if ($wasSeatReserved && $order->trip) {
+            $order->trip->increment('seat_available');
+        }
 
         \App\Models\OrderQrSession::where('order_id', $id)->delete();
 

@@ -490,6 +490,50 @@ class TripController extends Controller
         ]);
     }
 
+    public function dashboardSummary(Request $request)
+    {
+        $user = $request->user();
+
+        $balance = \App\Models\DriverBalance::where('user_id', $user->id)
+            ->value('balance') ?? 0;
+
+        $now = now();
+
+        $upcomingTrips = Trip::with([
+                'originPoint.city',
+                'destinationPoint.city',
+            ])
+            ->where('mitra_id', $user->id)
+            ->whereNotIn('status', ['cancelled', 'completed'])
+            ->where(function ($q) use ($now) {
+                $q->where('departure_date', '>', $now->toDateString())
+                  ->orWhere(function ($q2) use ($now) {
+                      $q2->where('departure_date', $now->toDateString())
+                         ->where('departure_time', '>=', $now->toTimeString());
+                  });
+            })
+            ->orderBy('departure_date', 'asc')
+            ->orderBy('departure_time', 'asc')
+            ->take(2)
+            ->get()
+            ->map(function ($trip) {
+                return [
+                    'id' => $trip->id,
+                    'vehicle_type' => $trip->vehicle_type,
+                    'departure_date' => $trip->departure_date,
+                    'departure_time' => $trip->departure_time,
+                    'status' => $trip->status,
+                    'origin_point' => $trip->originPoint,
+                    'destination_point' => $trip->destinationPoint,
+                ];
+            });
+
+        return response()->json([
+            'balance' => $balance,
+            'upcoming_trips' => $upcomingTrips,
+        ]);
+    }
+
     public function myTrips(Request $request)
     {
         $user = $request->user();
