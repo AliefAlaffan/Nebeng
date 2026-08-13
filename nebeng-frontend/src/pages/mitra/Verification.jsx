@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
 import CameraCapture from "../../components/verification/CameraCapture";
-import { ChevronRight, ChevronLeft, UploadCloud, CheckCircle2, Camera, FileText, UserCheck, Trash2, Loader2, CreditCard, ShieldCheck, BadgeCheck, Car, Plus, Bike, Package } from "lucide-react";
+import { ChevronRight, ChevronLeft, UploadCloud, CheckCircle2, Camera, FileText, UserCheck, Trash2, Loader2, ShieldCheck, BadgeCheck, Car, Plus, Bike, Package } from "lucide-react";
 
 // Konfigurasi kamera untuk masing-masing step foto data diri (biometrik)
 const CAMERA_CONFIG = {
@@ -10,7 +10,6 @@ const CAMERA_CONFIG = {
 	selfie: { facingMode: "user", guide: "face", title: "Selfie dengan KTP", description: "Pegang KTP di bawah dagu, pastikan wajah & KTP terlihat jelas." },
 	sim: { facingMode: "environment", guide: "card", title: "Foto SIM", description: "Letakkan SIM rata di dalam bingkai, hindari pantulan cahaya." },
 	skck: { facingMode: "environment", guide: "none", title: "Foto SKCK", description: "Pastikan seluruh halaman SKCK terlihat jelas dan tidak terpotong." },
-	bank: { facingMode: "environment", guide: "none", title: "Foto Buku Tabungan / Rekening", description: "Pastikan nomor rekening dan nama pemilik terlihat jelas." },
 };
 
 export default function Verification() {
@@ -22,7 +21,6 @@ export default function Verification() {
 		selfie: null,
 		sim: null,
 		skck: null,
-		bank: null,
 	});
 	const [cameraTarget, setCameraTarget] = useState(null); // "face" | "ktp" | "selfie" | null
 
@@ -38,9 +36,6 @@ export default function Verification() {
 		city: "",
 		district: "",
 		village: "",
-		bank_name: "",
-		bank_account_name: "",
-		bank_account_number: "",
 	});
 
 	const [loading, setLoading] = useState(false);
@@ -99,7 +94,6 @@ export default function Verification() {
 	const ktpGalleryInputRef = useRef(null);
 	const simInputRef = useRef(null);
 	const skckInputRef = useRef(null);
-	const bankInputRef = useRef(null);
 
 	const handleFileChange = (e, type) => {
 		const file = e.target.files[0];
@@ -163,13 +157,6 @@ export default function Verification() {
 			formData.append("village", form.village);
 
 			// =========================
-			// BANK
-			// =========================
-			formData.append("bank_name", form.bank_name);
-			formData.append("bank_account_name", form.bank_account_name);
-			formData.append("bank_account_number", form.bank_account_number);
-
-			// =========================
 			// FILES
 			// =========================
 			formData.append("face", files.face);
@@ -178,7 +165,6 @@ export default function Verification() {
 
 			formData.append("sim", files.sim);
 			formData.append("skck", files.skck);
-			formData.append("bank", files.bank);
 
 			const res = await fetch("http://127.0.0.1:8000/api/verification", {
 				method: "POST",
@@ -237,9 +223,8 @@ export default function Verification() {
 		{ id: 4, title: "Selfie KTP & Wajah", icon: UserCheck },
 		{ id: 5, title: "Foto SIM", icon: BadgeCheck },
 		{ id: 6, title: "SKCK", icon: ShieldCheck },
-		{ id: 7, title: "Rekening", icon: CreditCard },
-		{ id: 8, title: "Kendaraan", icon: Car },
-		{ id: 9, title: "Konfirmasi", icon: CheckCircle2 },
+		{ id: 7, title: "Kendaraan", icon: Car },
+		{ id: 8, title: "Konfirmasi", icon: CheckCircle2 },
 	];
 
 	return (
@@ -384,87 +369,8 @@ export default function Verification() {
 						/>
 					)}
 
-					{/* REKENING */}
-					{step === 7 && (
-						<div className="animate-in fade-in duration-300">
-							<h3 className="text-2xl font-black text-gray-800 mb-2 text-center">Informasi Rekening</h3>
-
-							<p className="text-sm text-gray-400 text-center mb-8">Rekening digunakan untuk pencairan saldo mitra.</p>
-
-							<div className="space-y-5">
-								<InputField label="Nama Bank" name="bank_name" value={form.bank_name} onChange={handleInput} />
-
-								<InputField label="Nama Pemilik Rekening" name="bank_account_name" value={form.bank_account_name} onChange={handleInput} />
-
-								<InputField label="Nomor Rekening" name="bank_account_number" type="number" value={form.bank_account_number} onChange={handleInput} />
-
-								<div>
-									<p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Bukti Buku Tabungan / Rekening</p>
-
-									<div
-										onClick={!files.bank ? () => setCameraTarget("bank") : undefined}
-										className={`relative border-2 border-dashed rounded-[2rem] transition-all cursor-pointer overflow-hidden group ${
-											files.bank ? "border-indigo-600 h-64" : "border-gray-200 hover:border-indigo-400 h-64 flex flex-col items-center justify-center bg-gray-50"
-										}`}
-									>
-										{files.bank ? (
-											<>
-												<img src={URL.createObjectURL(files.bank)} className="w-full h-full object-cover" alt="Preview" />
-
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														removeFile("bank");
-													}}
-													className="absolute top-4 right-4 p-2 bg-red-500 text-white rounded-full shadow-lg hover:scale-110 transition-all"
-												>
-													<Trash2 size={16} />
-												</button>
-											</>
-										) : (
-											<>
-												<div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform">
-													<Camera size={32} />
-												</div>
-
-												<p className="text-sm font-bold text-gray-500">Ketuk untuk buka kamera</p>
-
-												<p className="text-[10px] text-gray-400 mt-1">Foto langsung dari kamera, bukan galeri</p>
-											</>
-										)}
-									</div>
-
-									{!files.bank && (
-										<button
-											type="button"
-											onClick={() => bankInputRef.current.click()}
-											className="mt-4 text-xs font-bold text-indigo-500 hover:text-indigo-700 underline underline-offset-2 flex items-center justify-center gap-1.5 mx-auto"
-										>
-											<UploadCloud size={14} /> atau pilih dari galeri
-										</button>
-									)}
-									<input type="file" ref={bankInputRef} onChange={(e) => handleFileChange(e, "bank")} className="hidden" accept="image/*" />
-								</div>
-							</div>
-
-							<div className="flex items-center gap-4 mt-10">
-								<button onClick={() => setStep(6)} className="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition-all">
-									Kembali
-								</button>
-
-								<button
-									onClick={() => setStep(8)}
-									disabled={!files.bank || !form.bank_name || !form.bank_account_name || !form.bank_account_number}
-									className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
-								>
-									Lanjut <ChevronRight size={20} />
-								</button>
-							</div>
-						</div>
-					)}
-
 					{/* DATA KENDARAAN */}
-					{step === 8 && (
+					{step === 7 && (
 						<div className="animate-in fade-in duration-300">
 							<h3 className="text-2xl font-black text-gray-800 mb-2 text-center">Data Kendaraan</h3>
 
@@ -531,12 +437,12 @@ export default function Verification() {
 							</div>
 
 							<div className="flex items-center gap-4 mt-10">
-								<button onClick={() => setStep(7)} className="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition-all">
+								<button onClick={() => setStep(6)} className="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition-all">
 									Kembali
 								</button>
 
 								<button
-									onClick={() => setStep(9)}
+									onClick={() => setStep(8)}
 									disabled={vehicles.length === 0}
 									className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
 								>
@@ -547,7 +453,7 @@ export default function Verification() {
 					)}
 
 					{/* KONFIRMASI */}
-					{step === 9 && (
+					{step === 8 && (
 						<div className="animate-in fade-in zoom-in duration-300">
 							<h3 className="text-xl font-bold text-gray-800 text-center mb-6">Periksa Kembali Dokumen Anda</h3>
 
@@ -561,8 +467,6 @@ export default function Verification() {
 								<ReviewCard label="SIM" img={preview(files.sim)} />
 
 								<ReviewCard label="SKCK" img={preview(files.skck)} />
-
-								<ReviewCard label="Rekening" img={preview(files.bank)} />
 							</div>
 
 							{vehicles.length > 0 && (
@@ -582,7 +486,7 @@ export default function Verification() {
 							)}
 
 							<div className="flex items-center gap-4">
-								<button onClick={() => setStep(8)} className="flex-1 py-4 border-2 border-gray-100 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
+								<button onClick={() => setStep(7)} className="flex-1 py-4 border-2 border-gray-100 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
 									<ChevronLeft size={20} /> Kembali
 								</button>
 

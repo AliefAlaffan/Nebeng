@@ -209,7 +209,6 @@ export default function DetailMitra() {
 	const selfieKtpImage = getVerificationFile("selfie_ktp");
 	const simImage = getVerificationFile("sim");
 	const skckImage = getVerificationFile("skck");
-	const bankImage = getVerificationFile("bank");
 
 	return (
 		<AdminLayout>
@@ -334,8 +333,8 @@ export default function DetailMitra() {
 									<h4 className="font-black text-lg">Surat Izin Mengemudi</h4>
 								</div>
 
-								<ReadOnlyField label="Status Dokumen" value={skckImage ? "Uploaded" : "Belum Upload"} />
-								{/* <ReadOnlyField label="Status Verifikasi" value={dataMitra.verification?.status || "-"} /> */}
+									<ReadOnlyField label="Status Dokumen" value={skckImage ? "Uploaded" : "Belum Upload"} />
+								<ReadOnlyField label="Status Verifikasi" value={dataMitra.verification?.status || "-"} />
 							</div>
 
 							{simImage ? <ImagePreview label="Foto SIM" img={simImage} onZoom={() => setSelectedImg(simImage)} /> : <EmptyImage text="Foto SIM belum tersedia" />}
@@ -355,23 +354,6 @@ export default function DetailMitra() {
 							</div>
 
 							{skckImage ? <ImagePreview label="Foto SKCK" img={skckImage} onZoom={() => setSelectedImg(skckImage)} /> : <EmptyImage text="Foto SKCK belum tersedia" />}
-						</div>
-					</DataSection>
-
-					{/* REKENING */}
-					<DataSection title="Informasi Rekening">
-						<div className="flex flex-col lg:flex-row gap-10">
-							<div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-8">
-								<ReadOnlyField label="Nama Bank" value={dataMitra.profile?.bank_name || "-"} />
-
-								<ReadOnlyField label="Nama Pemilik Rekening" value={dataMitra.profile?.bank_account_name || "-"} />
-
-								<ReadOnlyField label="Nomor Rekening" value={dataMitra.profile?.bank_account_number || "-"} />
-
-								<ReadOnlyField label="Status Verifikasi" value={dataMitra.verification?.status || "-"} />
-							</div>
-
-							{bankImage ? <ImagePreview label="Foto Buku Rekening" img={bankImage} onZoom={() => setSelectedImg(bankImage)} /> : <EmptyImage text="Foto rekening belum tersedia" />}
 						</div>
 					</DataSection>
 

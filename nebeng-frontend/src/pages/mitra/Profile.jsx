@@ -89,11 +89,11 @@ export default function Profile() {
 		},
 		{
 			id: 12,
-			label: "Tarik Saldo",
+			label: "Riwayat Pendapatan",
 			icon: Wallet,
 			color: "text-amber-600",
 			bg: "bg-amber-50",
-			path: "/mitra/tarik-saldo",
+			path: "/mitra/riwayat-saldo",
 		},
 	];
 

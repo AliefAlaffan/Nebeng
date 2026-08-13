@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RewardManagementController;
 use App\Http\Controllers\Api\PosMitraVoucherController;
 use App\Http\Controllers\Api\AdminBalanceController;
+use App\Http\Controllers\Api\AdminRevenueController;    
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -129,7 +130,6 @@ Route::post('/trips/{id}/status', [TripJourneyController::class, 'updateStatus']
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/balance', [BalanceController::class, 'getBalance']);
     Route::get('/balance/history', [BalanceController::class, 'history']);
-    Route::post('/balance/withdraw', [BalanceController::class, 'withdraw']);
 });
 
 Route::middleware('auth:sanctum')->get('/reward-points', function (Request $request) {
@@ -200,6 +200,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // DATA ORDER
     Route::get('/admin/orders', [AdminOrderController::class, 'index']);
+    Route::get('/admin/pendapatan', [AdminRevenueController::class, 'index']);
+ 
 
     Route::middleware('auth:sanctum')->group(function () {
 

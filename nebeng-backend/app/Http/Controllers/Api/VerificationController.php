@@ -89,12 +89,6 @@ class VerificationController extends Controller
                 // FILES
                 'sim' => 'required|image|max:10120',
                 'skck' => 'required|image|max:10120',
-                'bank' => 'required|image|max:10120',
-
-                // BANK
-                'bank_name' => 'required|string|max:255',
-                'bank_account_name' => 'required|string|max:255',
-                'bank_account_number' => 'required|string|max:255',
             ]);
         }
 
@@ -124,11 +118,6 @@ class VerificationController extends Controller
                 'city' => $request->city,
                 'district' => $request->district,
                 'village' => $request->village,
-
-                // BANK
-                'bank_name' => $request->bank_name,
-                'bank_account_name' => $request->bank_account_name,
-                'bank_account_number' => $request->bank_account_number,
             ]
         );
 
@@ -156,7 +145,6 @@ class VerificationController extends Controller
             $files = array_merge($files, [
                 'sim',
                 'skck',
-                'bank'
             ]);
         }
 

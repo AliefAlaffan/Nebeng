@@ -153,29 +153,24 @@ export default function Dashboard() {
 										<div className="p-2 bg-white/10 rounded-lg shrink-0">
 											<TrendingUp size={16} className="text-emerald-400 md:w-5 md:h-5" />
 										</div>
-										<p className="text-indigo-200 text-[10px] md:text-sm font-bold uppercase tracking-wider">Saldo</p>
+										<p className="text-indigo-200 text-[10px] md:text-sm font-bold uppercase tracking-wider">Total Pendapatan</p>
 									</div>
-									<Link
-										to="/mitra/tarik-saldo"
-										onClick={handleProtectedClick}
-										className={`bg-white text-indigo-900 px-4 md:px-6 py-2 rounded-xl text-[10px] md:text-sm font-black shadow-lg transition-all ${!isVerified ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-50 active:scale-95"}`}
-									>
-										Tarik Saldo
-									</Link>
 								</div>
 
 								{/* Amount Section */}
-								<div className="flex items-center gap-3 mb-8">
+								<div className="flex items-center gap-3 mb-2">
 									<h2 className="text-3xl md:text-5xl font-black tracking-tighter truncate">{loadingBalance ? "..." : showBalance ? formatRupiah(balance) : "Rp ••••••••"}</h2>
 									<button onClick={() => setShowBalance(!showBalance)} className="p-2 hover:bg-white/10 rounded-full transition-colors shrink-0">
 										{showBalance ? <Eye size={20} className="text-indigo-300 md:w-6 md:h-6" /> : <EyeOff size={20} className="text-indigo-300 md:w-6 md:h-6" />}
 									</button>
 								</div>
 
+								<p className="text-indigo-300 text-[10px] md:text-xs font-medium mb-6">Pembayaran QRIS masuk langsung ke rekening/e-wallet kamu, bukan ditahan di aplikasi.</p>
+
 								{/* Footer Info */}
 								<div className="flex items-center justify-between border-t border-white/10 pt-5">
 									<Link to="/mitra/riwayat-saldo" className="flex items-center text-[10px] md:text-xs font-bold text-indigo-300 hover:text-white transition-all group">
-										Riwayat Saldo
+										Riwayat Pendapatan
 										<ChevronRight size={14} className="ml-1 group-hover:translate-x-1 transition-transform" />
 									</Link>
 								</div>

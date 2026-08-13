@@ -1,4 +1,4 @@
-import AppRouter from "./router/router";
+import AppRouter from "./router/Router";
 import { Toaster } from "react-hot-toast";
 import { UserProvider } from "./context/UserContext";
 

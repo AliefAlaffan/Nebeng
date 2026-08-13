@@ -77,6 +77,7 @@ export default function AdminLayout({ children }) {
 		if (path.includes("/admin/customer")) return "Daftar Customer";
 		if (path.includes("/admin/blokir-customer")) return "Blokir Customer";
 		if (path.includes("/admin/pesanan")) return "Pesanan";
+		if (path.includes("/admin/pendapatan")) return "Pendapatan";
 		if (path.includes("/admin/refund")) return "Refund";
 		if (path.includes("/admin/laporan")) return "Laporan";
 		if (path.includes("/admin/settings")) return "Pengaturan Sistem";

@@ -187,11 +187,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
 							<ChevronRight size={16} />
 						</NavLink>
 
-						{/* Penarikan Saldo */}
-						<NavLink to="/admin/penarikan-saldo" onClick={() => setSidebarOpen(false)} className={menuStyle}>
+						{/* PENDAPATAN */}
+						{/* Sebelumnya "Penarikan Saldo" -> diganti "Pendapatan" karena
+						    mitra tidak lagi menarik saldo lewat platform (QRIS statis
+						    langsung masuk ke rekening/e-wallet mitra sendiri). Halaman
+						    ini sudah dibangun lengkap dengan filter tanggal. */}
+						<NavLink to="/admin/pendapatan" onClick={() => setSidebarOpen(false)} className={menuStyle}>
 							<div className="flex items-center gap-4">
-								<Wallet size={20} />
-								<span className="text-sm font-bold">Penarikan Saldo</span>
+								<DollarSign size={20} />
+								<span className="text-sm font-bold">Pendapatan</span>
 							</div>
 							<ChevronRight size={16} />
 						</NavLink>

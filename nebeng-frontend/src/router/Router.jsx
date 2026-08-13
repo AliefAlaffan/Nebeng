@@ -31,7 +31,7 @@ const EditProfileAdmin = lazy(() => import("../pages/admin/EditProfile"));
 const AturPasswordAdmin = lazy(() => import("../pages/customer/AturPassword"));
 const AturHarga = lazy(() => import("../pages/admin/PricingManagement"));
 const KelolaReward = lazy(() => import("../pages/admin/KelolaReward"));
-const PenarikanSaldo = lazy(() => import("../pages/admin/PenarikanSaldo"));
+const Pendapatan = lazy(() => import("../pages/admin/Pendapatan"));
 const AdminSosMonitor = lazy(() => import("../pages/admin/AdminSosMonitor"));
 
 /* CUSTOMER */
@@ -199,10 +199,10 @@ function AppRouter() {
 			/>
 			
 			<Route
-				path="/admin/penarikan-saldo"
+				path="/admin/pendapatan"
 				element={
 					<ProtectedRoute role="admin">
-						<PenarikanSaldo />
+						<Pendapatan />
 					</ProtectedRoute>
 				}
 			/>

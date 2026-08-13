@@ -13,20 +13,9 @@ export default function RiwayatSaldo() {
 
 	const [saldo, setSaldo] = useState(0);
 
-	const tabs = ["Semua", "Proses", "Berhasil", "Ditolak"];
+	// Data dummy berdasarkan referensi gambar image_f6fd0f.png
 
-	// Status dari backend: pending | completed | rejected
-	const statusLabelMap = {
-		pending: "Proses",
-		completed: "Berhasil",
-		rejected: "Ditolak",
-	};
-
-	const statusColorMap = {
-		Proses: "bg-orange-100 text-orange-600",
-		Berhasil: "bg-emerald-100 text-emerald-600",
-		Ditolak: "bg-red-100 text-red-600",
-	};
+	const tabs = ["Semua", "Proses", "Berhasil"];
 
 	const filteredData = riwayatData.filter((item) => (activeTab === "Semua" ? true : item.status === activeTab)).filter((item) => item.deskripsi.toLowerCase().includes(search.toLowerCase()));
 
@@ -56,7 +45,7 @@ export default function RiwayatSaldo() {
 					}),
 					deskripsi: item.description || "Transaksi",
 					jumlah: item.amount,
-					status: statusLabelMap[item.status] || "Berhasil",
+					status: "Berhasil", // sementara semua berhasil
 					type: item.type === "credit" ? "in" : "out",
 				}));
 
@@ -92,6 +81,15 @@ export default function RiwayatSaldo() {
 		fetchBalance();
 	}, []);
 
+	// Sebelumnya teks bulan di card "Saldo Tersisa" statis ("Oktober 2024").
+	// Sekarang otomatis ikut bulan & tahun saat ini.
+	const currentMonthLabel = new Date()
+		.toLocaleDateString("id-ID", {
+			month: "long",
+			year: "numeric",
+		})
+		.toUpperCase();
+
 	return (
 		<MitraLayout>
 			<div className="w-full max-w-screen-xl mx-auto px-4 py-6 space-y-6">
@@ -101,7 +99,7 @@ export default function RiwayatSaldo() {
 						<button onClick={() => navigate(-1)} className="p-2 bg-white rounded-xl shadow-sm border border-gray-100 hover:bg-gray-50 transition-all active:scale-95">
 							<ChevronLeft size={24} className="text-indigo-900" />
 						</button>
-						<h1 className="text-2xl font-black text-indigo-900 tracking-tight">Riwayat Saldo</h1>
+						<h1 className="text-2xl font-black text-indigo-900 tracking-tight">Riwayat Pendapatan</h1>
 					</div>
 
 					<button className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-900 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-800 transition-all active:scale-95">
@@ -116,11 +114,11 @@ export default function RiwayatSaldo() {
 						{/* Summary Card */}
 						<div className="bg-gradient-to-br from-indigo-900 to-indigo-800 rounded-[32px] p-8 text-white shadow-xl relative overflow-hidden group">
 							<div className="relative z-10">
-								<p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mb-2">Saldo Tersisa</p>
+								<p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mb-2">Total Pendapatan</p>
 								<h2 className="text-3xl font-black tracking-tighter mb-6">Rp {saldo.toLocaleString("id-ID")}</h2>
 								<div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider bg-white/10 w-fit px-3 py-1.5 rounded-full border border-white/10">
 									<CalendarIcon size={12} className="text-indigo-300" />
-									{new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+									{currentMonthLabel}
 								</div>
 							</div>
 							<Wallet size={140} className="absolute -right-8 -bottom-8 text-white opacity-5 transform -rotate-12 group-hover:scale-110 transition-transform duration-700" />
@@ -171,7 +169,7 @@ export default function RiwayatSaldo() {
 											<div className="min-w-0">
 												<div className="flex items-center gap-2 mb-1">
 													<h4 className="text-sm font-black text-gray-800 truncate">{item.deskripsi}</h4>
-													<span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shrink-0 ${statusColorMap[item.status] || "bg-gray-100 text-gray-500"}`}>{item.status}</span>
+													<span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter ${item.status === "Berhasil" ? "bg-emerald-100 text-emerald-600" : "bg-orange-100 text-orange-600"}`}>{item.status}</span>
 												</div>
 												<p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
 													{item.tanggal} • {item.jam}
