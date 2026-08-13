@@ -29,13 +29,17 @@ class OrderController extends Controller
             'payment_method' => 'required|in:cash,qris,ewallet' 
         ]);
 
-        $trip = Trip::findOrFail($request->trip_id);
-
-        if ($request->payment_method === 'cash' && auth()->user()->late_cancel_count >= 3) {
+        // Customer yang sudah 3x+ membatalkan pesanan cash secara mendadak
+        // (<3 jam sebelum keberangkatan) wajib pakai QRIS (bayar di muka)
+        // untuk pesanan berikutnya, supaya mitra tidak terus menanggung
+        // risiko kursi kosong tanpa kompensasi.
+        if ($request->payment_method === 'cash' && $request->user()->late_cancel_count >= 3) {
             return response()->json([
                 'message' => 'Karena riwayat pembatalan mendadak, akun Anda saat ini hanya bisa memesan dengan pembayaran QRIS.'
             ], 400);
         }
+
+        $trip = Trip::findOrFail($request->trip_id);
 
         // Cek apakah customer sudah punya pesanan aktif yang BENAR-BENAR VALID/LUNAS (bukan yang mangkrak belum bayar)
         $existingOrder = Order::where('trip_id', $trip->id)
@@ -307,7 +311,7 @@ class OrderController extends Controller
     public function cancelOrder(Request $request, $id)
     {
         $order = Order::with('trip')->findOrFail($id);
-
+        
         $departureTime = Carbon::parse($order->trip->departure_time);
         $now = Carbon::now();
         $hoursDifference = $now->diffInHours($departureTime, false);
@@ -325,7 +329,9 @@ class OrderController extends Controller
             // Cash belum pernah dibayar di muka, jadi tidak ada uang yang
             // bisa "hangus". Sebagai gantinya, pembatalan mepet waktu (<3 jam)
             // dicatat sebagai pelanggaran (strike) pada akun customer, karena
-            // mitra sudah terlanjur mengunci kursi/waktu untuk mereka.
+            // mitra sudah terlanjur mengunci kursi/waktu untuk mereka:
+            // strike ke-3 -> wajib QRIS untuk pesanan berikutnya (lihat store())
+            // strike ke-5 -> akun otomatis disuspend (status = blocked)
             $isLateCancel = $hoursDifference < 3;
 
             $order->update([
@@ -339,14 +345,24 @@ class OrderController extends Controller
 
             if ($isLateCancel) {
                 $customer = User::find($order->customer_id);
+                $message = 'Pesanan tunai dibatalkan. Karena dilakukan kurang dari 3 jam sebelum keberangkatan, ini tercatat sebagai pembatalan mendadak.';
+
                 if ($customer) {
                     $customer->increment('late_cancel_count');
+                    $customer->refresh();
+
+                    if ($customer->late_cancel_count >= 5) {
+                        $customer->update(['status' => 'blocked']);
+                        $message = 'Pesanan tunai dibatalkan. Karena riwayat pembatalan mendadak sudah berulang kali, akun Anda telah disuspend. Silakan hubungi admin untuk informasi lebih lanjut.';
+                    } elseif ($customer->late_cancel_count >= 3) {
+                        $message = 'Pesanan tunai dibatalkan. Karena riwayat pembatalan mendadak, akun Anda sekarang wajib menggunakan QRIS untuk pesanan berikutnya.';
+                    }
                 }
 
                 return response()->json([
                     'success' => true,
                     'rule' => 'cash_late_cancel_penalty',
-                    'message' => 'Pesanan tunai dibatalkan. Karena dilakukan kurang dari 3 jam sebelum keberangkatan, ini tercatat sebagai pembatalan mendadak. Jika hal ini berulang, akun Anda akan diwajibkan membayar via QRIS di muka untuk pesanan berikutnya.'
+                    'message' => $message,
                 ], 200);
             }
 
@@ -378,11 +394,9 @@ class OrderController extends Controller
         $refundAmount = (int) round($order->price * $percentage / 100);
 
         // Jika mitra SUDAH mengonfirmasi pembayaran (saldo mitra sudah
-        // ditambah di confirmPayment()), maka bagian yang wajib direfund
-        // harus otomatis ditarik kembali dari saldo mitra saat itu juga.
-        // Sebelumnya ini tidak pernah terjadi -> saldo mitra tetap penuh
-        // walau customer sudah "dijanjikan" refund, sehingga refund tidak
-        // pernah benar-benar bisa diproses admin.
+        // ditambah di confirmPayment()), bagian yang wajib direfund harus
+        // otomatis ditarik kembali dari saldo mitra saat itu juga - supaya
+        // "janji refund" ini benar-benar tercatat, bukan cuma status kosong.
         if ($order->payment_status === 'paid' && $refundAmount > 0) {
             $mitraId = $order->trip->mitra_id;
 

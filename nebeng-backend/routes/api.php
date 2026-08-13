@@ -32,7 +32,8 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RewardManagementController;
 use App\Http\Controllers\Api\PosMitraVoucherController;
 use App\Http\Controllers\Api\AdminBalanceController;
-use App\Http\Controllers\Api\AdminRevenueController;    
+use App\Http\Controllers\Api\AdminRevenueController;
+use App\Http\Controllers\Api\OrderComplaintController;      
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -300,6 +301,8 @@ Route::middleware(['auth:sanctum','role:customer' ])->group(function () {
     Route::post('/payment', [PaymentController::class, 'createPayment']);
 
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
+    Route::post('/orders/{id}/complaint', [OrderComplaintController::class, 'store']);
+    Route::get('/orders/{id}/complaint', [OrderComplaintController::class, 'show']);
 
     Route::post('/trips/{tripId}/sos', [TripController::class, 'sendSos']);
 });
@@ -312,4 +315,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/sos-alerts', [TripController::class, 'adminGetSosList']);
     Route::post('/admin/sos/{sosId}/rebuke', [TripController::class, 'adminRebukeMitra']);
     Route::post('/admin/sos-alerts/{id}/resolve', [TripController::class, 'adminResolveSos']);
+    Route::get('/admin/complaints', [OrderComplaintController::class, 'adminIndex']);
+    Route::post('/admin/complaints/{id}/action', [OrderComplaintController::class, 'adminAct']);
 });

@@ -898,6 +898,7 @@ class TripController extends Controller
         ], 200);
     }
 
+    // 4. Digunakan Admin untuk menandai sinyal SOS sebagai selesai ditangani
     public function adminResolveSos($id)
     {
         $sos = SosLog::findOrFail($id);
