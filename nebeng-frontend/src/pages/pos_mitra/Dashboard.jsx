@@ -74,16 +74,23 @@ export default function Dashboard() {
 
 				const tripsData = await tripsResponse.json();
 
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+
 				const mappedTrips = tripsData
-					.filter((order) => order.trip && order.status === "pending")
+					.filter((order) => {
+						if (!order.trip || order.status !== "pending") return false;
+						const departureDate = new Date(order.trip.departure_date);
+						departureDate.setHours(0, 0, 0, 0);
+						return departureDate >= today; 
+					})
+					.sort((a, b) => new Date(a.trip.departure_date) - new Date(b.trip.departure_date))
 					.slice(0, 5)
 					.map((order) => {
 						const trip = order.trip;
-
 						const departureDate = new Date(trip.departure_date);
-
 						return {
-							id: order.id,
+							id: trip.id, 
 
 							day: departureDate.toLocaleDateString("id-ID", {
 								weekday: "short",
@@ -109,7 +116,10 @@ export default function Dashboard() {
 
 							destination_detail: order.drop_address || "Tidak ada alamat",
 
-							estimated_income: order.price || 0,
+							// Pakai harga dari TRIP (bukan order) supaya angka yang tampil di
+							// list ini selalu sama persis dengan yang tampil di halaman detail
+							// (keduanya sama-sama merujuk trip yang sama sekarang).
+							estimated_income: trip.price || 0,
 						};
 					});
 
