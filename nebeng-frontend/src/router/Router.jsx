@@ -9,7 +9,7 @@ const Login = lazy(() => import("../pages/Login"));
 const Register = lazy(() => import("../pages/Register"));
 
 
-/* ADMIN */
+/* ADMIN */	
 const Dashboard = lazy(() => import("../pages/admin/Dashboard"));
 const Pesanan = lazy(() => import("../pages/admin/Pesanan"));
 const Laporan = lazy(() => import("../pages/admin/Laporan"));
@@ -103,6 +103,7 @@ const EditProfilePosMitra = lazy(() => import("../pages/pos_mitra/EditProfile"))
 const AturPINPosMitra = lazy(() => import("../pages/pos_mitra/AturPin"));
 const AturPasswordPosMitra = lazy(() => import("../pages/pos_mitra/AturPassword"));
 const KlaimVoucher = lazy(() => import("../pages/pos_mitra/KlaimVoucher"));
+const NotifikasiPosMitra = lazy(() => import("../pages/pos_mitra/Notifikasi"));
 
 function RouteLoadingFallback() {
 	return (
@@ -912,6 +913,24 @@ function AppRouter() {
 					</ProtectedRoute>
 				}
 			/>
+
+			<Route
+	path="/pos-mitra/atur-password"
+	element={
+		<ProtectedRoute role="pos_mitra">
+			<AturPasswordPosMitra />
+		</ProtectedRoute>
+	}
+		/>
+
+		<Route
+			path="/pos-mitra/notifikasiMitra"
+			element={
+				<ProtectedRoute role="pos_mitra">
+					<NotifikasiPosMitra />
+				</ProtectedRoute>
+			}
+		/>
 		</Routes>
 		</Suspense>
 	);
