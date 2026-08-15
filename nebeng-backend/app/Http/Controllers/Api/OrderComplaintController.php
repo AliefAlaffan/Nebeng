@@ -23,12 +23,12 @@ class OrderComplaintController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Hanya order QRIS yang sudah dibatalkan & memang dijanjikan refund
-        // yang boleh dilaporkan - mencegah laporan asal untuk order yang
-        // memang tidak berhak refund (non_refundable / cash / belum batal).
-        if ($order->status !== 'cancelled' || $order->payment_method !== 'qris' || !in_array($order->refund_status, ['pending_100_percent', 'pending_50_percent'])) {
+        // Order boleh dilaporkan pada 2 kondisi:
+        // 1. Sudah lewat waktu wajar tapi mitra belum juga transfer (status masih pending_X_percent)
+        // 2. Mitra KLAIM sudah transfer (mitra_claimed), tapi customer merasa belum menerima dana
+        if ($order->status !== 'cancelled' || $order->payment_method !== 'qris' || !in_array($order->refund_status, ['pending_100_percent', 'pending_50_percent', 'mitra_claimed'])) {
             return response()->json([
-                'message' => 'Order ini tidak memenuhi syarat untuk dilaporkan (bukan pembatalan QRIS yang berhak refund).'
+                'message' => 'Order ini tidak memenuhi syarat untuk dilaporkan (bukan pembatalan QRIS yang berhak refund, atau refund sudah selesai).'
             ], 400);
         }
 
@@ -48,6 +48,11 @@ class OrderComplaintController extends Controller
             'description' => $request->description,
             'status' => 'pending',
         ]);
+
+        // Tandai order sebagai "disputed" supaya langsung terlihat di dashboard
+        // admin sebagai kasus yang butuh perhatian - terutama kasus rawan
+        // konflik: mitra sudah klaim transfer, tapi customer bilang belum terima.
+        $order->update(['refund_status' => 'disputed']);
 
         return response()->json([
             'success' => true,
@@ -126,5 +131,19 @@ class OrderComplaintController extends Controller
             'message' => $message,
             'complaint' => $complaint->fresh(['order', 'customer', 'mitra']),
         ], 200);
+    }
+
+    // ================= ADMIN: PANTAUAN TRANSPARAN SEMUA REFUND =================
+    // Menampilkan SEMUA order yang refund-nya masih berjalan (belum tuntas),
+    // baik yang sudah dilaporkan formal maupun belum, supaya admin bisa
+    // memantau proaktif - bukan cuma menunggu ada laporan masuk.
+    public function adminRefundOverview()
+    {
+        $orders = Order::with(['customer', 'trip.mitra'])
+            ->whereIn('refund_status', ['pending_100_percent', 'pending_50_percent', 'mitra_claimed', 'disputed'])
+            ->latest('cancelled_at')
+            ->get();
+
+        return response()->json($orders);
     }
 }

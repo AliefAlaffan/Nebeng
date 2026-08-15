@@ -279,6 +279,7 @@ Route::middleware(['auth:sanctum','role:mitra'])->group(function () {
     Route::get('/mitra/dashboard-summary', [TripController::class, 'dashboardSummary']);
     
     Route::post('/mitra/orders/{id}/no-show', [OrderController::class, 'markAsNoShow']);
+    Route::post('/mitra/orders/{id}/refund-confirm', [OrderController::class, 'mitraConfirmRefund']);
 
 });
 
@@ -303,6 +304,7 @@ Route::middleware(['auth:sanctum','role:customer' ])->group(function () {
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancelOrder']);
     Route::post('/orders/{id}/complaint', [OrderComplaintController::class, 'store']);
     Route::get('/orders/{id}/complaint', [OrderComplaintController::class, 'show']);
+    Route::post('/orders/{id}/refund-confirm', [OrderController::class, 'customerConfirmRefund']);
 
     Route::post('/trips/{tripId}/sos', [TripController::class, 'sendSos']);
 });
@@ -317,4 +319,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/admin/sos-alerts/{id}/resolve', [TripController::class, 'adminResolveSos']);
     Route::get('/admin/complaints', [OrderComplaintController::class, 'adminIndex']);
     Route::post('/admin/complaints/{id}/action', [OrderComplaintController::class, 'adminAct']);
+    Route::get('/admin/refunds', [OrderComplaintController::class, 'adminRefundOverview']);
 });

@@ -24,6 +24,9 @@ class Order extends Model
         'readiness_status',
         'refund_status',
         'refund_percentage',
+        'refund_amount',
+        'mitra_refund_confirmed_at',
+        'customer_refund_confirmed_at',
         'penalty_amount',
         'cancelled_at',
     ];

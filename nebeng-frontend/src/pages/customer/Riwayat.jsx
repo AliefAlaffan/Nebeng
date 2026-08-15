@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, Bike, Car, Package, Inbox, User, Clock, ArrowRight, Search } from "lucide-react";
+import { ChevronLeft, Bike, Car, Package, Inbox, User, Clock, ArrowRight, Search, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function Riwayat() {
@@ -113,6 +113,10 @@ export default function Riwayat() {
 						passengers: order.seats + " Orang",
 
 						price: "Rp" + Number(order.price).toLocaleString(),
+
+						// Dipakai untuk badge "Refund Menunggu Konfirmasi" di daftar
+						refundStatus: order.refund_status,
+						refundAmount: order.refund_amount,
 					};
 				});
 
@@ -198,39 +202,51 @@ export default function Riwayat() {
 					{/* LIST PESANAN */}
 					<div className="lg:col-span-9 space-y-4">
 						{filteredData.length > 0 ? (
-							filteredData.map((item) => (
-								<div key={item.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-									<div className="flex justify-between">
-										<div>
-											<div className="flex items-center gap-3 mb-3">
-												<div className="p-2.5 bg-indigo-50 text-indigo-900 rounded-xl">
-													<item.icon size={20} />
-												</div>
-
-												<span className="text-sm font-bold text-gray-800">{item.type}</span>
+							filteredData.map((item) => {
+							const needsRefundConfirm = item.refundStatus === "mitra_claimed";
+							return (
+							<div key={item.id} className={`bg-white rounded-3xl p-6 shadow-sm border ${needsRefundConfirm ? "border-2 border-amber-300" : "border-gray-100"}`}>
+								{needsRefundConfirm && (
+									<div className="mb-4 -mt-1 flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-2 rounded-xl">
+										<Wallet size={16} className="shrink-0" />
+										<p className="text-xs font-black">Refund Rp {Number(item.refundAmount).toLocaleString("id-ID")} Menunggu Konfirmasi Anda!</p>
+									</div>
+								)}
+								<div className="flex justify-between">
+									<div>
+										<div className="flex items-center gap-3 mb-3">
+											<div className="p-2.5 bg-indigo-50 text-indigo-900 rounded-xl">
+												<item.icon size={20} />
 											</div>
 
-											<p className="text-sm text-gray-600">
-												{item.from} → {item.to}
-											</p>
-
-											<p className="text-xs text-gray-400 mt-2">
-												{item.date} • {item.time}
-											</p>
+											<span className="text-sm font-bold text-gray-800">{item.type}</span>
 										</div>
 
-										<div className="text-right">
-											<p className={`text-xs font-bold ${item.statusColor}`}>{item.status}</p>
+										<p className="text-sm text-gray-600">
+											{item.from} → {item.to}
+										</p>
 
-											<p className="text-lg font-black text-indigo-900 mt-2">{item.price}</p>
+										<p className="text-xs text-gray-400 mt-2">
+											{item.date} • {item.time}
+										</p>
+									</div>
 
-											<button className="mt-3 px-4 py-2 bg-indigo-900 text-white rounded-lg text-xs font-bold" onClick={() => navigate(`/customer/pesanan/${item.id}`)}>
-												Detail
-											</button>
-										</div>
+									<div className="text-right">
+										<p className={`text-xs font-bold ${item.statusColor}`}>{item.status}</p>
+
+										<p className="text-lg font-black text-indigo-900 mt-2">{item.price}</p>
+
+										<button
+											className={`mt-3 px-4 py-2 rounded-lg text-xs font-bold ${needsRefundConfirm ? "bg-amber-500 text-white animate-pulse" : "bg-indigo-900 text-white"}`}
+											onClick={() => navigate(`/customer/pesanan/${item.id}`)}
+										>
+											{needsRefundConfirm ? "Konfirmasi Sekarang" : "Detail"}
+										</button>
 									</div>
 								</div>
-							))
+							</div>
+							);
+						})
 						) : (
 							<div className="bg-white rounded-3xl p-20 text-center border-2 border-dashed border-gray-100">
 								<div className="bg-gray-50 p-6 rounded-full mb-4 inline-block">

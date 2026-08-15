@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import MitraLayout from "../../components/dashboard/MitraLayout";
-import { MapPin, MessageCircle, ChevronLeft, Navigation, CheckCircle2, Clock3, ChevronUp, ChevronDown, Milestone, Maximize2, Crosshair, QrCode } from "lucide-react";
+import { MapPin, MessageCircle, ChevronLeft, Navigation, CheckCircle2, Clock3, ChevronUp, ChevronDown, Milestone, Maximize2, Crosshair, QrCode, Wallet, AlertTriangle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import QRCode from "react-qr-code";
 import SuccessPopup from "../../components/ui/SuccessPopup";
+import ConfirmModal from "../../components/ui/ConfirmModal";
+import AlertModal from "../../components/ui/AlertModal";
 import axios from '../../api/axios';
 
 import L from "leaflet";
@@ -184,6 +186,8 @@ export default function PerjalananMitra() {
                         paymentProof: order.payment_proof,
                         readinessStatus: order.readiness_status || 'pending',
                         orderStatus: order.status, // Menangkap status pesanan (aktif/cancelled)
+                        refundStatus: order.refund_status,
+                        refundAmount: order.refund_amount,
                     }));
 
                     setCustomers(formattedCustomers);
@@ -282,6 +286,32 @@ export default function PerjalananMitra() {
             alert("Terjadi kesalahan saat mengonfirmasi pembayaran.");
         } finally {
             setConfirmingPaymentId(null);
+        }
+    };
+
+    // ================= KONFIRMASI REFUND MITRA -> CUSTOMER =================
+    const [refundTargetId, setRefundTargetId] = useState(null);
+    const [processingRefund, setProcessingRefund] = useState(false);
+    const [alertInfo, setAlertInfo] = useState({ show: false, type: "success", title: "", message: "" });
+
+    const handleConfirmRefund = async () => {
+        if (!refundTargetId) return;
+        try {
+            setProcessingRefund(true);
+            const response = await axios.post(`/mitra/orders/${refundTargetId}/refund-confirm`);
+            setRefundTargetId(null);
+            setCustomers((prev) => prev.map((c) => (c.orderId === refundTargetId ? { ...c, refundStatus: "mitra_claimed" } : c)));
+            setAlertInfo({ show: true, type: "success", title: "Konfirmasi Terkirim", message: response.data.message });
+        } catch (err) {
+            setRefundTargetId(null);
+            setAlertInfo({
+                show: true,
+                type: "error",
+                title: "Gagal Konfirmasi",
+                message: err.response?.data?.message || "Terjadi kesalahan saat mengonfirmasi refund.",
+            });
+        } finally {
+            setProcessingRefund(false);
         }
     };
 
@@ -506,6 +536,45 @@ export default function PerjalananMitra() {
                                         {customer.orderStatus === 'cancelled' && (
                                             <div className="bg-red-50 border border-red-200 text-red-600 rounded-2xl p-3 text-xs font-bold">
                                                 ⚠️ Pesanan ini telah dibatalkan oleh customer.
+                                            </div>
+                                        )}
+
+                                        {/* KARTU AKSI REFUND (khusus QRIS yang berhak refund) */}
+                                        {["pending_100_percent", "pending_50_percent"].includes(customer.refundStatus) && (
+                                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+                                                <div className="flex items-start gap-2">
+                                                    <Wallet size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                                    <p className="text-xs font-bold text-amber-700 leading-relaxed">
+                                                        Anda wajib mengembalikan dana <span className="font-black">Rp {Number(customer.refundAmount).toLocaleString("id-ID")}</span> ke customer ini via QRIS/transfer manual.
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setRefundTargetId(customer.orderId)}
+                                                    className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-[11px] uppercase tracking-wider transition-all"
+                                                >
+                                                    Saya Sudah Transfer Dana
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {customer.refundStatus === "mitra_claimed" && (
+                                            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-3 flex items-center gap-2">
+                                                <Clock3 size={16} className="text-indigo-500 shrink-0" />
+                                                <p className="text-xs font-bold text-indigo-700">Menunggu customer mengonfirmasi penerimaan dana.</p>
+                                            </div>
+                                        )}
+
+                                        {customer.refundStatus === "disputed" && (
+                                            <div className="bg-red-50 border border-red-200 rounded-2xl p-3 flex items-center gap-2">
+                                                <AlertTriangle size={16} className="text-red-500 shrink-0" />
+                                                <p className="text-xs font-bold text-red-600">Customer melaporkan belum menerima dana. Kasus ini sedang ditinjau Admin.</p>
+                                            </div>
+                                        )}
+
+                                        {customer.refundStatus === "refunded" && (
+                                            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 flex items-center gap-2">
+                                                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                                                <p className="text-xs font-bold text-emerald-700">Refund selesai - sudah dikonfirmasi diterima oleh customer.</p>
                                             </div>
                                         )}
 
@@ -769,6 +838,25 @@ export default function PerjalananMitra() {
 
             <SuccessPopup show={departureVerified} onClose={() => setDepartureVerified(false)} title="Perjalanan Dimulai" message="QR keberangkatan berhasil diverifikasi Pos Mitra. Selamat menempuh perjalanan." />
             <SuccessPopup show={tripCompleted} onClose={() => setTripCompleted(false)} title="Perjalanan Selesai" message="QR berhasil diverifikasi Pos Mitra. Perjalanan ini telah selesai." />
+
+            {/* KONFIRMASI TRANSFER REFUND */}
+            <ConfirmModal
+                show={!!refundTargetId}
+                title="Konfirmasi Transfer Refund"
+                message="Pastikan Anda sudah benar-benar mentransfer dana ke customer sebelum konfirmasi. Klaim palsu dapat dilaporkan dan diperiksa oleh Admin."
+                confirmText="Ya, Saya Sudah Transfer"
+                loading={processingRefund}
+                onConfirm={handleConfirmRefund}
+                onCancel={() => setRefundTargetId(null)}
+            />
+
+            <AlertModal
+                show={alertInfo.show}
+                type={alertInfo.type}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                onClose={() => setAlertInfo((prev) => ({ ...prev, show: false }))}
+            />
         </MitraLayout>
     );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, Bike, Car, Package, ArrowUp, MapPin, Users, Calendar, Compass, XCircle, Home, Loader2, Star, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Bike, Car, Package, ArrowUp, MapPin, Users, Calendar, Compass, XCircle, Home, Loader2, Star, AlertTriangle, Wallet, CheckCircle2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "../../api/axios";
 import AlertModal from "../../components/ui/AlertModal";
@@ -37,8 +37,8 @@ export default function Pesanan() {
                 setOrder(found);
 
                 // Kalau order ini QRIS dan sudah dibatalkan dengan status refund
-                // yang masih pending, cek apakah customer sudah pernah lapor.
-                if (found && found.payment_method === "qris" && ["pending_100_percent", "pending_50_percent"].includes(found.refund_status)) {
+                // yang masih pending / diklaim mitra, cek apakah customer sudah pernah lapor.
+                if (found && found.payment_method === "qris" && ["pending_100_percent", "pending_50_percent", "mitra_claimed"].includes(found.refund_status)) {
                     try {
                         const complaintRes = await axios.get(`/orders/${orderId}/complaint`);
                         if (complaintRes.data) setComplaint(complaintRes.data);
@@ -55,6 +55,31 @@ export default function Pesanan() {
 
         fetchOrder();
     }, [orderId]);
+
+    // KONFIRMASI DANA DITERIMA (mitra sudah klaim transfer)
+    const [loadingConfirmReceived, setLoadingConfirmReceived] = useState(false);
+    const confirmReceived = async () => {
+        try {
+            setLoadingConfirmReceived(true);
+            const response = await axios.post(`/orders/${orderId}/refund-confirm`);
+            setOrder((prev) => ({ ...prev, refund_status: "refunded" }));
+            setAlertInfo({
+                show: true,
+                type: "success",
+                title: "Terkonfirmasi",
+                message: response.data.message,
+            });
+        } catch (err) {
+            setAlertInfo({
+                show: true,
+                type: "error",
+                title: "Gagal Konfirmasi",
+                message: err.response?.data?.message || "Terjadi kesalahan saat mengonfirmasi.",
+            });
+        } finally {
+            setLoadingConfirmReceived(false);
+        }
+    };
 
     // KIRIM LAPORAN MITRA (refund QRIS belum dikembalikan)
     const submitComplaint = async () => {
@@ -185,6 +210,39 @@ export default function Pesanan() {
                     </div>
                 </div>
 
+                {/* AKSI DIPERLUKAN: KONFIRMASI REFUND DITERIMA (banner besar, tidak mungkin terlewat) */}
+                {order.refund_status === "mitra_claimed" && !complaint && (
+                    <div className="bg-gradient-to-br from-indigo-900 to-indigo-950 rounded-[2rem] p-6 shadow-xl shadow-indigo-900/20 text-white space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 bg-white/10 rounded-2xl flex items-center justify-center shrink-0 border border-white/20">
+                                <Wallet size={22} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Aksi Diperlukan</p>
+                                <h2 className="text-base font-black leading-tight">Konfirmasi Penerimaan Refund</h2>
+                            </div>
+                        </div>
+                        <p className="text-sm text-indigo-100 leading-relaxed">
+                            Mitra mengklaim sudah mentransfer <span className="font-black text-white">Rp {Number(order.refund_amount).toLocaleString("id-ID")}</span> ke Anda. Mohon konfirmasi apakah dana sudah benar-benar diterima.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={confirmReceived}
+                                disabled={loadingConfirmReceived}
+                                className="flex-1 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-indigo-950 font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {loadingConfirmReceived ? <Loader2 className="animate-spin" size={16} /> : <><CheckCircle2 size={16} /> Sudah Diterima</>}
+                            </button>
+                            <button
+                                onClick={() => setShowComplaintModal(true)}
+                                className="flex-1 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-black text-xs uppercase tracking-wider transition-all"
+                            >
+                                Belum Diterima
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* BANNER KALENDER / JADWAL */}
                 <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 flex items-center gap-5">
                     <div className="w-14 h-14 bg-indigo-900 rounded-2xl text-white flex flex-col items-center justify-center shadow-lg shrink-0">
@@ -271,21 +329,49 @@ export default function Pesanan() {
                         </button>
                     )}
 
-                    {isCancelled && order.payment_method === "qris" && ["pending_100_percent", "pending_50_percent"].includes(order.refund_status) && (
-                        complaint ? (
-                            <div className="w-full py-4 rounded-2xl bg-amber-50 border border-amber-100 text-center">
-                                <p className="text-xs font-black text-amber-700 uppercase tracking-widest">
-                                    {complaint.status === "resolved" ? "Laporan Sudah Ditindaklanjuti" : "Laporan Sedang Ditinjau Admin"}
-                                </p>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => setShowComplaintModal(true)}
-                                className="w-full py-4.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-600 font-black text-sm uppercase tracking-widest transition-all active:scale-[0.99] flex items-center justify-center gap-2"
-                            >
-                                <AlertTriangle size={16} /> Laporkan Mitra (Refund Belum Diterima)
-                            </button>
-                        )
+                    {/* STATUS & AKSI REFUND QRIS */}
+                    {isCancelled && order.payment_method === "qris" && (
+                        <>
+                            {["pending_100_percent", "pending_50_percent"].includes(order.refund_status) && (
+                                complaint ? (
+                                    <div className="w-full py-4 rounded-2xl bg-amber-50 border border-amber-100 text-center">
+                                        <p className="text-xs font-black text-amber-700 uppercase tracking-widest">
+                                            {complaint.status === "resolved" ? "Laporan Sudah Ditindaklanjuti" : "Laporan Sedang Ditinjau Admin"}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="w-full py-4 rounded-2xl bg-gray-50 border border-gray-100 text-center space-y-2">
+                                        <p className="text-xs font-bold text-gray-500">Menunggu mitra mentransfer refund Rp {Number(order.refund_amount).toLocaleString("id-ID")}.</p>
+                                        <button
+                                            onClick={() => setShowComplaintModal(true)}
+                                            className="text-amber-600 text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 mx-auto"
+                                        >
+                                            <AlertTriangle size={14} /> Laporkan Mitra
+                                        </button>
+                                    </div>
+                                )
+                            )}
+
+                            {order.refund_status === "mitra_claimed" && complaint && (
+                                <div className="w-full py-4 rounded-2xl bg-amber-50 border border-amber-100 text-center">
+                                    <p className="text-xs font-black text-amber-700 uppercase tracking-widest">
+                                        {complaint.status === "resolved" ? "Laporan Sudah Ditindaklanjuti" : "Laporan Sedang Ditinjau Admin"}
+                                    </p>
+                                </div>
+                            )}
+
+                            {order.refund_status === "disputed" && (
+                                <div className="w-full py-4 rounded-2xl bg-red-50 border border-red-100 text-center">
+                                    <p className="text-xs font-black text-red-600 uppercase tracking-widest">Laporan Anda Sedang Ditinjau Admin</p>
+                                </div>
+                            )}
+
+                            {order.refund_status === "refunded" && (
+                                <div className="w-full py-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-center">
+                                    <p className="text-xs font-black text-emerald-700 uppercase tracking-widest">Refund Selesai Dikonfirmasi</p>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     <button

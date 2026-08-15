@@ -402,6 +402,7 @@ class OrderController extends Controller
             'status' => 'cancelled',
             'refund_status' => $refundStatus,
             'refund_percentage' => $percentage,
+            'refund_amount' => $refundAmount,
             'cancelled_at' => $now,
         ]);
 
@@ -418,6 +419,60 @@ class OrderController extends Controller
             'refund_percentage' => $percentage,
             'refund_amount' => $refundAmount,
             'message' => $message,
+        ], 200);
+    }
+
+    // ================= MITRA: KLAIM SUDAH TRANSFER REFUND =================
+    public function mitraConfirmRefund(Request $request, $id)
+    {
+        $order = Order::with('trip')->findOrFail($id);
+
+        if ($order->trip->mitra_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if (!in_array($order->refund_status, ['pending_100_percent', 'pending_50_percent'])) {
+            return response()->json([
+                'message' => 'Order ini tidak sedang menunggu konfirmasi refund dari Anda.'
+            ], 400);
+        }
+
+        $order->update([
+            'refund_status' => 'mitra_claimed',
+            'mitra_refund_confirmed_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Konfirmasi transfer refund berhasil dicatat. Menunggu konfirmasi penerimaan dari customer.',
+            'order' => $order->fresh(),
+        ], 200);
+    }
+
+    // ================= CUSTOMER: KONFIRMASI DANA DITERIMA =================
+    public function customerConfirmRefund(Request $request, $id)
+    {
+        $order = Order::findOrFail($id);
+
+        if ($order->customer_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($order->refund_status !== 'mitra_claimed') {
+            return response()->json([
+                'message' => 'Belum ada klaim transfer refund dari mitra untuk order ini.'
+            ], 400);
+        }
+
+        $order->update([
+            'refund_status' => 'refunded',
+            'customer_refund_confirmed_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Terima kasih sudah konfirmasi. Refund untuk order ini dinyatakan selesai.',
+            'order' => $order->fresh(),
         ], 200);
     }
 }
