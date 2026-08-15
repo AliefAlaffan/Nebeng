@@ -26,7 +26,7 @@ class ItemOrderController extends Controller
 
         'delivery_date' => 'required|date',
 
-        'size' => 'required|in:dokumen,kecil,sedang,besar',
+        'size' => 'required|in:dokumen,xxs,xs,kecil,sedang,besar',
 
         'item_description' => 'nullable|string',
 

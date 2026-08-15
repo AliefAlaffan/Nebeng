@@ -17,6 +17,22 @@ function getStatusColor(status) {
 	return "bg-gray-50 text-gray-500";
 }
 
+// Sama seperti daftar opsi kapasitas di form "Tambah Nebeng Barang"
+// (NebengBarang.jsx) - dipakai supaya value mentah (xxs/xs/kecil/...)
+// ditampilkan sebagai label yang enak dibaca, bukan kode singkatnya.
+const baggageCapacityLabels = {
+	xxs: "XXS - Maksimal 0.5 Kg",
+	xs: "XS - Maksimal 1 Kg",
+	kecil: "Kecil - Maksimal 5 Kg",
+	sedang: "Sedang - Maksimal 10 Kg",
+	besar: "Besar - Maksimal 15 Kg",
+};
+
+function formatBaggageCapacity(value) {
+	if (!value) return "-";
+	return baggageCapacityLabels[value] || String(value);
+}
+
 export default function DetailTebenganMitra() {
 	const navigate = useNavigate();
 	const { tripId } = useParams();
@@ -78,6 +94,10 @@ export default function DetailTebenganMitra() {
 		);
 	}
 
+	// Trip barang (dikirim lewat Motor/Mobil/Bus khusus barang) tidak punya
+	// konsep "kursi" - yang relevan adalah kapasitas muatannya.
+	const isBarang = trip.vehicle_type?.includes("Barang");
+
 	const handleGenerateQR = async () => {
 		try {
 			const token = localStorage.getItem("token");
@@ -136,7 +156,7 @@ export default function DetailTebenganMitra() {
 					</div>
 
 					<div className="mt-8 pt-4 border-t border-gray-50 flex justify-between items-center">
-						<span className="text-xs font-bold text-gray-400">Estimasi Pendapatan / Kursi</span>
+						<span className="text-xs font-bold text-gray-400">{isBarang ? "Estimasi Pendapatan / Pengiriman" : "Estimasi Pendapatan / Kursi"}</span>
 						<span className="text-xl font-black text-indigo-900 tracking-tighter">Rp {Number(trip.price).toLocaleString("id-ID")},00</span>
 					</div>
 				</div>
@@ -149,7 +169,7 @@ export default function DetailTebenganMitra() {
 					<div className="space-y-4">
 						<InfoRow label="Nama Mitra" value={trip.mitra.name} />
 						<InfoRow label="Transportasi" value={trip.vehicle_type} />
-						<InfoRow label="Jumlah Kursi" value={trip.seat_total} />
+						{isBarang ? <InfoRow label="Kapasitas Muatan" value={formatBaggageCapacity(trip.baggage_capacity)} /> : <InfoRow label="Jumlah Kursi" value={trip.seat_total} />}
 					</div>
 				</div>
 
@@ -159,15 +179,20 @@ export default function DetailTebenganMitra() {
 
 					<div className="space-y-4">
 						<InfoRow label="Kendaraan" value={trip.vehicle_type || "-"} />
-						<InfoRow label="Total Kursi" value={trip.seat_total ?? "-"} />
-						<InfoRow label="Kursi Tersedia" value={trip.seat_available ?? "-"} />
-						<InfoRow label="Kapasitas Barang" value={trip.baggage_capacity ?? "-"} />
+						{isBarang ? (
+							<InfoRow label="Kapasitas Muatan" value={formatBaggageCapacity(trip.baggage_capacity)} />
+						) : (
+							<>
+								<InfoRow label="Total Kursi" value={trip.seat_total ?? "-"} />
+								<InfoRow label="Kursi Tersedia" value={trip.seat_available ?? "-"} />
+							</>
+						)}
 					</div>
 
 					{/* =========================
     FOTO BARANG CUSTOMER
 ========================= */}
-					{trip.vehicle_type?.includes("Barang") && trip.orders?.some((o) => o.item_order?.image) && (
+					{isBarang && trip.orders?.some((o) => o.item_order?.image) && (
 						<div className="mt-8">
 							<h4 className="text-sm font-black text-indigo-900 uppercase tracking-wider mb-4 flex items-center gap-2">
 								<Package size={16} className="text-indigo-500" />
@@ -274,48 +299,33 @@ export default function DetailTebenganMitra() {
 					</h3>
 
 					{(() => {
-						const isBarang = trip.vehicle_type?.includes("Barang");
-
-						// hitung order valid
-						const totalOrder = trip.orders?.length || 0;
-
 						if (isBarang) {
+							const isFilled = (trip.seat_total ?? 0) - (trip.seat_available ?? 0) > 0;
+
 							return (
 								<div className="space-y-5">
 									<div className="flex justify-between text-sm">
-										<span className="font-medium text-gray-400">Harga per Muatan</span>
+										<span className="font-medium text-gray-400">Harga per Pengiriman</span>
 
 										<span className="font-black text-gray-800">Rp {Number(trip.price || 0).toLocaleString("id-ID")}</span>
 									</div>
 
 									<div className="flex justify-between text-sm">
-										<span className="font-medium text-gray-400">Kapasitas Maksimal</span>
+										<span className="font-medium text-gray-400">Kapasitas Muatan</span>
 
-										<span className="font-black text-gray-800">{trip.baggage_capacity ?? 0}</span>
+										<span className="font-black text-gray-800">{formatBaggageCapacity(trip.baggage_capacity)}</span>
 									</div>
 
 									<div className="flex justify-between text-sm">
-										<span className="font-medium text-gray-400">Slot Total</span>
+										<span className="font-medium text-gray-400">Status Muatan</span>
 
-										<span className="font-black text-gray-800">{trip.seat_total ?? 0} Slot</span>
-									</div>
-
-									<div className="flex justify-between text-sm">
-										<span className="font-medium text-gray-400">Slot Terisi</span>
-
-										<span className="font-black text-gray-800">{(trip.seat_total ?? 0) - (trip.seat_available ?? 0)} Slot</span>
-									</div>
-
-									<div className="flex justify-between text-sm">
-										<span className="font-medium text-gray-400">Slot Tersisa</span>
-
-										<span className="font-black text-gray-800">{trip.seat_available ?? 0} Slot</span>
+										<span className="font-black text-gray-800">{isFilled ? "Sudah Terisi" : "Masih Kosong"}</span>
 									</div>
 
 									<div className="pt-5 border-t-2 border-gray-100 flex justify-between items-center">
-										<span className="text-lg font-black text-indigo-900 uppercase tracking-widest">Potensi Maksimal</span>
+										<span className="text-lg font-black text-indigo-900 uppercase tracking-widest">Potensi Pendapatan</span>
 
-										<span className="text-2xl font-black text-emerald-500 tracking-tighter">Rp {(trip.seat_total * (trip.price || 0)).toLocaleString("id-ID")}</span>
+										<span className="text-2xl font-black text-emerald-500 tracking-tighter">Rp {Number(trip.price || 0).toLocaleString("id-ID")}</span>
 									</div>
 								</div>
 							);

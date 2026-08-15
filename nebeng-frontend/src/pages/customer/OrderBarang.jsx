@@ -46,55 +46,13 @@ export default function OrderBarang() {
 	};
 
 	// =====================================
-	// HANDLE ORDER
+	// NOTE: Order/ItemOrder TIDAK dibuat di sini lagi.
+	// Klik "Pilih" cuma membawa customer ke halaman Detail Pesanan lalu
+	// Pembayaran - order barang baru benar-benar dibuat di Pembayaran.jsx,
+	// setelah metode bayar dipilih & dikonfirmasi (sama seperti alur
+	// penumpang). Ini supaya order tidak nyangkut/tampil ke mitra kalau
+	// customer belum sampai tahap konfirmasi pembayaran.
 	// =====================================
-
-	const handleOrder = async (tripId) => {
-		try {
-			const token = localStorage.getItem("token");
-
-			const formData = new FormData();
-
-			formData.append("trip_id", tripId);
-			formData.append("origin_point_id", origin_id);
-			formData.append("destination_point_id", destination_id);
-			formData.append("delivery_date", date);
-			formData.append("size", size);
-
-			formData.append("item_description", description || "");
-
-			// WAJIB
-			formData.append("payment_method", "cash");
-
-			if (image) {
-				formData.append("image", image);
-			}
-
-			const res = await fetch("http://127.0.0.1:8000/api/item-orders", {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${token}`,
-					Accept: "application/json",
-				},
-				body: formData,
-			});
-
-			const data = await res.json();
-
-			console.log("ITEM ORDER RESPONSE:", data);
-
-			if (!res.ok) {
-				alert(data.message || "Gagal membuat order");
-				return null;
-			}
-
-			return data;
-		} catch (err) {
-			console.error(err);
-			alert("Terjadi kesalahan");
-			return null;
-		}
-	};
 
 	// =====================================
 	// FETCH TRIPS
@@ -445,15 +403,14 @@ export default function OrderBarang() {
 												<span className="text-2xl font-black text-indigo-900 tracking-tighter">Rp. {ride.price.toLocaleString("id-ID")}</span>
 											</div>
 											<button
-												onClick={async () => {
-													const result = await handleOrder(ride.id);
-
-													if (!result) return;
-
-													navigate(`/customer/detail-order/${ride.id}?type=barang`, {
+												onClick={() => {
+													// Belum membuat order apa pun di sini - cuma membawa
+													// data barang (ukuran, deskripsi, foto) ke halaman
+													// Detail Pesanan lewat state. Order/ItemOrder baru
+													// dibuat nanti di halaman Pembayaran setelah metode
+													// bayar dipilih & dikonfirmasi.
+													navigate(`/customer/detail-order/${ride.id}?type=barang&origin_id=${origin_id}&destination_id=${destination_id}&date=${date}`, {
 														state: {
-															order: result.order,
-															item_order: result.item_order,
 															image,
 															preview,
 															size,

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
 import { ChevronLeft, User, Phone, Receipt, ShieldCheck, ArrowRight } from "lucide-react";
 
 export default function DetailOrder() {
 	const { tripId } = useParams();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const [searchParams] = useSearchParams();
 
 	const type = searchParams.get("type");
@@ -13,6 +14,11 @@ export default function DetailOrder() {
 	const destination_id = searchParams.get("destination_id");
 	const date = searchParams.get("date");
 	const backUrl = `/customer/order-${type}?origin_id=${origin_id}&destination_id=${destination_id}&date=${date}`;
+
+	// Data khusus pengiriman barang (size/description/image) yang dibawa dari
+	// OrderBarang.jsx lewat navigate state - belum ada order/item order yang
+	// dibuat sampai titik ini.
+	const barangState = location.state || {};
 
 	const [isAgreed, setIsAgreed] = useState(false);
 	const [trip, setTrip] = useState(null);
@@ -68,9 +74,12 @@ export default function DetailOrder() {
 	}
 
 	const handlePayment = () => {
+		const isBarang = type === "barang";
+
 		const orderData = {
 			trip_id: trip.id,
 			customer_id: customer.id,
+			type: isBarang ? "barang" : "penumpang",
 
 			no_pemesanan: orderDetail.noPemesanan,
 			date: orderDetail.date,
@@ -86,13 +95,32 @@ export default function DetailOrder() {
 
 			driver: orderDetail.driver,
 			customer: orderDetail.customer,
+
+			// Field tambahan yang dibutuhkan POST /api/item-orders di halaman
+			// Pembayaran, khusus untuk order barang.
+			...(isBarang && {
+				origin_point_id: origin_id,
+				destination_point_id: destination_id,
+				delivery_date: date,
+				size: barangState.size,
+				item_description: barangState.description,
+			}),
 		};
 
-		// simpan sementara ke localStorage
+		// simpan sementara ke localStorage (foto TIDAK ikut disimpan di sini
+		// karena File tidak bisa di-JSON.stringify - foto diteruskan lewat
+		// navigate state di bawah)
 		localStorage.setItem("pending_order", JSON.stringify(orderData));
 
 		// redirect ke pembayaran
-		navigate("/customer/pembayaran");
+		navigate("/customer/pembayaran", {
+			state: isBarang
+				? {
+						image: barangState.image,
+						preview: barangState.preview,
+					}
+				: undefined,
+		});
 	};
 
 	return (

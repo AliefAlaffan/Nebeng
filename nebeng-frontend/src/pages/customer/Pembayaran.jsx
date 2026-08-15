@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
 import { ChevronLeft, ChevronRight, QrCode, Banknote, Wallet, CheckCircle2, Package, ShieldCheck, ArrowRight } from "lucide-react";
 
@@ -7,6 +7,12 @@ export default function Pembayaran() {
 	const [selectedMethod, setSelectedMethod] = useState(null);
 	const [isProcessing, setIsProcessing] = useState(false);
 	const navigate = useNavigate();
+	const location = useLocation();
+
+	// Foto barang (kalau ini order barang) dibawa lewat navigate state dari
+	// DetailOrder.jsx - tidak disimpan di localStorage karena File tidak
+	// bisa di-JSON.stringify.
+	const image = location.state?.image || null;
 
 	const [orderData] = useState(() => {
 		const savedOrder = localStorage.getItem("pending_order");
@@ -20,6 +26,8 @@ export default function Pembayaran() {
 	}, [orderData, navigate]);
 
 	if (!orderData) return null;
+
+	const isBarang = orderData.type === "barang";
 
 	const paymentMethods = [
 		{ id: "qris", name: "QRIS", desc: "Pindai QR pengemudi untuk membayar", icon: QrCode, type: "nontunai" },
@@ -58,21 +66,53 @@ export default function Pembayaran() {
 		try {
 			const token = localStorage.getItem("token");
 
-			const orderRes = await fetch("http://127.0.0.1:8000/api/orders", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Accept: "application/json",
-					Authorization: `Bearer ${token}`,
-				},
-				body: JSON.stringify({
-					trip_id: orderData.trip_id,
-					pickup_address: orderData.pickup_address,
-					drop_address: orderData.drop_address,
-					payment_method: mapPaymentMethod(selectedMethod.id),
-					price: orderData.price,
-				}),
-			});
+			let orderRes;
+
+			if (isBarang) {
+				// =========================================
+				// ORDER BARANG - baru dibuat di sini, saat customer
+				// benar-benar konfirmasi metode bayar. Ini yang membuat
+				// ItemOrder + Order sekaligus di backend.
+				// =========================================
+				const formData = new FormData();
+
+				formData.append("trip_id", orderData.trip_id);
+				formData.append("origin_point_id", orderData.origin_point_id);
+				formData.append("destination_point_id", orderData.destination_point_id);
+				formData.append("delivery_date", orderData.delivery_date);
+				formData.append("size", orderData.size || "");
+				formData.append("item_description", orderData.item_description || "");
+				formData.append("payment_method", mapPaymentMethod(selectedMethod.id));
+
+				if (image) {
+					formData.append("image", image);
+				}
+
+				orderRes = await fetch("http://127.0.0.1:8000/api/item-orders", {
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+					},
+					body: formData,
+				});
+			} else {
+				orderRes = await fetch("http://127.0.0.1:8000/api/orders", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Accept: "application/json",
+						Authorization: `Bearer ${token}`,
+					},
+					body: JSON.stringify({
+						trip_id: orderData.trip_id,
+						pickup_address: orderData.pickup_address,
+						drop_address: orderData.drop_address,
+						payment_method: mapPaymentMethod(selectedMethod.id),
+						price: orderData.price,
+					}),
+				});
+			}
 
 			const orderResponse = await orderRes.json();
 
@@ -171,28 +211,6 @@ export default function Pembayaran() {
 										</div>
 									</div>
 								</div>
-
-								{/* Info Barang Card */}
-								{/* <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
-									<div className="flex justify-between items-center mb-6">
-										<div className="flex items-center gap-2 text-indigo-900">
-											<Package size={20} />
-											<h3 className="font-black uppercase tracking-wider text-sm">Berat Barang</h3>
-										</div>
-										<span className="text-lg font-black text-indigo-900">{orderData.barang.berat}</span>
-									</div>
-
-									<div className="space-y-4">
-										<p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Foto Barang:</p>
-										<div className="w-full h-48 rounded-3xl overflow-hidden border border-gray-50 shadow-inner">
-											<img src={orderData.barang.foto} className="w-full h-full object-cover" alt="Barang" />
-										</div>
-										<div className="p-4 bg-gray-50 rounded-2xl">
-											<p className="text-[10px] font-black text-gray-400 uppercase mb-1">Deskripsi:</p>
-											<p className="text-xs text-gray-600 italic font-medium">"{orderData.barang.deskripsi}"</p>
-										</div>
-									</div>
-								</div> */}
 
 								{/* Total & Submit */}
 								<div className="bg-white rounded-4xl p-8 shadow-xl border border-indigo-50">
