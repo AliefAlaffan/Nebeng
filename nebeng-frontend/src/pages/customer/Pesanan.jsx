@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, Bike, Car, Package, ArrowUp, MapPin, Users, Calendar, Compass, XCircle, Home, Loader2, Star, AlertTriangle, Wallet, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Bike, Car, Package, ArrowUp, MapPin, Users, Calendar, Compass, XCircle, Home, Loader2, Star, AlertTriangle, Wallet, CheckCircle2, MessageCircle, ShieldAlert } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "../../api/axios";
 import AlertModal from "../../components/ui/AlertModal";
@@ -240,6 +240,12 @@ export default function Pesanan() {
                                 Belum Diterima
                             </button>
                         </div>
+                        <button
+                            onClick={() => navigate("/customer/pesan")}
+                            className="w-full text-center text-indigo-300 hover:text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all"
+                        >
+                            <MessageCircle size={13} /> Masih ragu? Cek riwayat chat dengan mitra
+                        </button>
                     </div>
                 )}
 
@@ -306,6 +312,17 @@ export default function Pesanan() {
                         </div>
                     )}
 
+                    {isCancelled && (
+                        <div className="pt-2">
+                            <button
+                                onClick={() => navigate(`/customer/perjalanan/${order.trip_id}`)}
+                                className="w-full py-3.5 rounded-2xl bg-gray-50 hover:bg-gray-100 border border-gray-100 text-gray-600 font-black text-xs uppercase tracking-widest transition-all active:scale-[0.99] flex items-center justify-center gap-2"
+                            >
+                                <Compass size={16} /> Lihat Halaman Perjalanan
+                            </button>
+                        </div>
+                    )}
+
                     <div className="border-t border-gray-50 pt-5 space-y-3">
                         <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Detail Pemesanan</h3>
                         <div className="bg-gray-50/60 border border-gray-100 rounded-2xl p-4 flex items-center justify-between">
@@ -329,46 +346,79 @@ export default function Pesanan() {
                         </button>
                     )}
 
+                    {/* PENJELASAN: TIDAK BERHAK REFUND (dibatalkan < 3 jam) */}
+                    {isCancelled && order.payment_method === "qris" && order.refund_status === "non_refundable" && (
+                        <div className="w-full rounded-2xl bg-gray-50 border border-gray-100 p-4 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gray-200 text-gray-500 flex items-center justify-center shrink-0">
+                                <XCircle size={16} />
+                            </div>
+                            <div>
+                                <p className="text-xs font-black text-gray-700">Tidak Ada Refund</p>
+                                <p className="text-xs text-gray-500 mt-1">Pembatalan dilakukan kurang dari 3 jam sebelum keberangkatan, sesuai kebijakan dana QRIS dinyatakan hangus.</p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* STATUS & AKSI REFUND QRIS */}
-                    {isCancelled && order.payment_method === "qris" && (
+                    {isCancelled && order.payment_method === "qris" && order.refund_status !== "non_refundable" && (
                         <>
-                            {["pending_100_percent", "pending_50_percent"].includes(order.refund_status) && (
-                                complaint ? (
-                                    <div className="w-full py-4 rounded-2xl bg-amber-50 border border-amber-100 text-center">
-                                        <p className="text-xs font-black text-amber-700 uppercase tracking-widest">
-                                            {complaint.status === "resolved" ? "Laporan Sudah Ditindaklanjuti" : "Laporan Sedang Ditinjau Admin"}
-                                        </p>
+                            {["pending_100_percent", "pending_50_percent"].includes(order.refund_status) && !complaint && (
+                                <div className="w-full rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-gray-200 text-gray-500 flex items-center justify-center shrink-0">
+                                            <Wallet size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-black text-gray-700">Menunggu Mitra Transfer Refund</p>
+                                            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                                                Refund <span className="font-bold">Rp {Number(order.refund_amount).toLocaleString("id-ID")}</span> akan dikirim mitra ke rekening/e-wallet Anda. Hubungi mitra untuk memastikan mereka punya info rekening Anda.
+                                            </p>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <div className="w-full py-4 rounded-2xl bg-gray-50 border border-gray-100 text-center space-y-2">
-                                        <p className="text-xs font-bold text-gray-500">Menunggu mitra mentransfer refund Rp {Number(order.refund_amount).toLocaleString("id-ID")}.</p>
+                                    <div className="flex gap-2 pt-1">
+                                        <button
+                                            onClick={() => navigate("/customer/pesan")}
+                                            className="flex-1 py-2.5 rounded-xl bg-indigo-900 hover:bg-indigo-800 text-white text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+                                        >
+                                            <MessageCircle size={14} /> Chat Mitra
+                                        </button>
                                         <button
                                             onClick={() => setShowComplaintModal(true)}
-                                            className="text-amber-600 text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 mx-auto"
+                                            className="flex-1 py-2.5 rounded-xl bg-white border border-amber-200 hover:bg-amber-50 text-amber-600 text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
                                         >
-                                            <AlertTriangle size={14} /> Laporkan Mitra
+                                            <AlertTriangle size={14} /> Laporkan
                                         </button>
                                     </div>
-                                )
-                            )}
-
-                            {order.refund_status === "mitra_claimed" && complaint && (
-                                <div className="w-full py-4 rounded-2xl bg-amber-50 border border-amber-100 text-center">
-                                    <p className="text-xs font-black text-amber-700 uppercase tracking-widest">
-                                        {complaint.status === "resolved" ? "Laporan Sudah Ditindaklanjuti" : "Laporan Sedang Ditinjau Admin"}
-                                    </p>
                                 </div>
                             )}
 
-                            {order.refund_status === "disputed" && (
-                                <div className="w-full py-4 rounded-2xl bg-red-50 border border-red-100 text-center">
-                                    <p className="text-xs font-black text-red-600 uppercase tracking-widest">Laporan Anda Sedang Ditinjau Admin</p>
+                            {(["pending_100_percent", "pending_50_percent"].includes(order.refund_status) && complaint) || order.refund_status === "disputed" ? (
+                                <div className="w-full rounded-2xl bg-red-50 border border-red-100 p-4 flex items-start gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-red-100 text-red-500 flex items-center justify-center shrink-0">
+                                        <ShieldAlert size={16} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-black text-red-700">
+                                            {complaint?.status === "resolved" ? "Laporan Sudah Ditindaklanjuti" : "Laporan Sedang Ditinjau Admin"}
+                                        </p>
+                                        <p className="text-xs text-red-500 mt-1 leading-relaxed">
+                                            {complaint?.status === "resolved"
+                                                ? "Admin sudah menindaklanjuti laporan Anda. Cek kembali status refund order ini secara berkala."
+                                                : "Tim Admin akan meninjau kasus ini dan menghubungi Anda serta mitra untuk penyelesaian. Mohon tunggu, tidak perlu lapor ulang."}
+                                        </p>
+                                    </div>
                                 </div>
-                            )}
+                            ) : null}
 
                             {order.refund_status === "refunded" && (
-                                <div className="w-full py-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-center">
-                                    <p className="text-xs font-black text-emerald-700 uppercase tracking-widest">Refund Selesai Dikonfirmasi</p>
+                                <div className="w-full rounded-2xl bg-emerald-50 border border-emerald-100 p-4 flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                                        <CheckCircle2 size={16} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-black text-emerald-700">Refund Selesai</p>
+                                        <p className="text-xs text-emerald-600 mt-1">Anda sudah mengonfirmasi dana ini diterima. Tidak ada tindakan lain yang diperlukan.</p>
+                                    </div>
                                 </div>
                             )}
                         </>
@@ -496,6 +546,7 @@ export default function Pesanan() {
                 type={alertInfo.type}
                 title={alertInfo.title}
                 message={alertInfo.message}
+                confirmText={alertInfo.type === "success" && alertInfo.title === "Pesanan Dibatalkan" ? "Mengerti" : "Oke"}
                 onClose={() => {
                     const wasCancelSuccess = alertInfo.type === "success" && alertInfo.title === "Pesanan Dibatalkan";
                     setAlertInfo((prev) => ({ ...prev, show: false }));
@@ -504,4 +555,4 @@ export default function Pesanan() {
             />
         </CustomerLayout>
     );
-}
+} 

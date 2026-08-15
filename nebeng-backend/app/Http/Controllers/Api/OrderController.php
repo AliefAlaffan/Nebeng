@@ -37,8 +37,14 @@ class OrderController extends Controller
 
         $trip = Trip::findOrFail($request->trip_id);
 
+        // PENTING: cancelOrder() tidak pernah mereset payment_status - jadi
+        // order QRIS yang sudah dibayar lalu dibatalkan tetap payment_status
+        // = 'paid' selamanya. Tanpa pengecualian status='cancelled' di sini,
+        // customer PERMANEN tidak bisa pesan lagi di trip yang sama walau
+        // pesanan sebelumnya sudah mereka batalkan sendiri.
         $existingOrder = Order::where('trip_id', $trip->id)
             ->where('customer_id', auth()->id())
+            ->where('status', '!=', 'cancelled')
             ->where(function($query) {
                 $query->where('payment_status', 'paid')
                       ->orWhere('payment_status', 'waiting_confirmation');
@@ -57,9 +63,15 @@ class OrderController extends Controller
             ], 400);
         }
 
+        // Sama seperti di atas: order cash yang dibatalkan tetap
+        // payment_status = 'unpaid' selamanya (cancelOrder tidak
+        // mereset field ini), jadi tanpa pengecualian ini, order LAMA
+        // yang sudah dibatalkan malah "dihidupkan kembali" alih-alih
+        // membuat order baru yang bersih.
         $pendingOrder = Order::where('trip_id', $trip->id)
             ->where('customer_id', auth()->id())
             ->where('payment_status', 'unpaid')
+            ->where('status', '!=', 'cancelled')
             ->first();
 
         if ($pendingOrder) {
@@ -365,17 +377,17 @@ class OrderController extends Controller
             $percentage = 100;
             $rule = 'refund_100';
             $refundStatus = 'pending_100_percent';
-            $message = 'Pembatalan berhasil. Karena dilakukan lebih dari 12 jam sebelum keberangkatan, Anda berhak mendapatkan refund 100% dari mitra.';
+            $message = 'Pembatalan berhasil. Anda berhak mendapatkan refund 100% karena dibatalkan lebih dari 12 jam sebelum keberangkatan. Segera hubungi mitra lewat menu Pesan untuk memberikan nomor rekening/e-wallet Anda, lalu konfirmasi di halaman Pesanan setelah dana diterima.';
         } elseif ($hoursDifference >= 3) {
             $percentage = 50;
             $rule = 'refund_50';
             $refundStatus = 'pending_50_percent';
-            $message = 'Pembatalan berhasil. Karena dilakukan antara 3 hingga 12 jam sebelum keberangkatan, Anda berhak mendapatkan refund 50% dari mitra.';
+            $message = 'Pembatalan berhasil. Anda berhak mendapatkan refund 50% karena dibatalkan 3-12 jam sebelum keberangkatan. Segera hubungi mitra lewat menu Pesan untuk memberikan nomor rekening/e-wallet Anda, lalu konfirmasi di halaman Pesanan setelah dana diterima.';
         } else {
             $percentage = 0;
             $rule = 'no_refund';
             $refundStatus = 'non_refundable';
-            $message = 'Pembatalan berhasil. Karena dilakukan kurang dari 3 jam sebelum keberangkatan, dana QRIS dinyatakan hangus.';
+            $message = 'Pembatalan berhasil. Karena dilakukan kurang dari 3 jam sebelum keberangkatan, dana QRIS dinyatakan hangus dan tidak ada refund.';
         }
 
         $refundAmount = (int) round($order->price * $percentage / 100);

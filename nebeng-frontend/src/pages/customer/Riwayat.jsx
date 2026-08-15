@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, Bike, Car, Package, Inbox, User, Clock, ArrowRight, Search, Wallet } from "lucide-react";
+import { ChevronLeft, Bike, Car, Package, Inbox, User, Clock, ArrowRight, Search, Wallet, MessageCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function Riwayat() {
@@ -204,12 +204,32 @@ export default function Riwayat() {
 						{filteredData.length > 0 ? (
 							filteredData.map((item) => {
 							const needsRefundConfirm = item.refundStatus === "mitra_claimed";
+							const refundOngoing = ["pending_100_percent", "pending_50_percent", "mitra_claimed", "disputed"].includes(item.refundStatus);
+
+							let refundBanner = null;
+							if (needsRefundConfirm) {
+								refundBanner = { style: "bg-amber-50 text-amber-700", icon: Wallet, text: `Refund Rp ${Number(item.refundAmount).toLocaleString("id-ID")} Menunggu Konfirmasi Anda!` };
+							} else if (["pending_100_percent", "pending_50_percent"].includes(item.refundStatus)) {
+								refundBanner = { style: "bg-gray-100 text-gray-600", icon: Wallet, text: `Refund Rp ${Number(item.refundAmount).toLocaleString("id-ID")} Sedang Diproses Mitra` };
+							} else if (item.refundStatus === "disputed") {
+								refundBanner = { style: "bg-red-50 text-red-600", icon: Wallet, text: "Laporan Refund Sedang Ditinjau Admin" };
+							} else if (item.refundStatus === "refunded") {
+								refundBanner = { style: "bg-emerald-50 text-emerald-600", icon: Wallet, text: "Refund Sudah Selesai" };
+							}
+
 							return (
 							<div key={item.id} className={`bg-white rounded-3xl p-6 shadow-sm border ${needsRefundConfirm ? "border-2 border-amber-300" : "border-gray-100"}`}>
-								{needsRefundConfirm && (
-									<div className="mb-4 -mt-1 flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-2 rounded-xl">
-										<Wallet size={16} className="shrink-0" />
-										<p className="text-xs font-black">Refund Rp {Number(item.refundAmount).toLocaleString("id-ID")} Menunggu Konfirmasi Anda!</p>
+								{refundBanner && (
+									<div className={`mb-4 -mt-1 flex items-center justify-between gap-2 px-3 py-2 rounded-xl ${refundBanner.style}`}>
+										<div className="flex items-center gap-2">
+											<refundBanner.icon size={16} className="shrink-0" />
+											<p className="text-xs font-black">{refundBanner.text}</p>
+										</div>
+										{refundOngoing && (
+											<button onClick={() => navigate("/customer/pesan")} className="shrink-0 p-1.5 rounded-lg bg-white/70 hover:bg-white transition-all" title="Chat Mitra">
+												<MessageCircle size={14} />
+											</button>
+										)}
 									</div>
 								)}
 								<div className="flex justify-between">
