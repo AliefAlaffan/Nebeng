@@ -1,13 +1,25 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import MitraSidebar from "./MitraSidebar";
-import { Menu, Bell, Search, ChevronDown, Bike, X } from "lucide-react";
+import { Menu, Bell, Search, ChevronDown, Bike, X, Wallet, ShieldAlert, MessageSquareWarning, Info } from "lucide-react";
 import { useUser } from "../../context/UserContext";
+
+// Ikon & warna popup disesuaikan dengan kategori notifikasi asli dari backend
+// (dulu selalu pakai ikon sepeda "Order Baru" walau isinya soal refund/SOS/dll).
+const NOTIF_CATEGORY_STYLE = {
+	order: { icon: Bike, color: "text-indigo-700", bg: "bg-indigo-100" },
+	payment: { icon: Wallet, color: "text-emerald-700", bg: "bg-emerald-100" },
+	sos: { icon: ShieldAlert, color: "text-red-700", bg: "bg-red-100" },
+	complaint: { icon: MessageSquareWarning, color: "text-amber-700", bg: "bg-amber-100" },
+	system: { icon: Info, color: "text-gray-700", bg: "bg-gray-100" },
+};
+const getNotifStyle = (category) => NOTIF_CATEGORY_STYLE[category] || NOTIF_CATEGORY_STYLE.system;
 
 export default function MitraLayout({ children }) {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [isScrolled] = useState(false);
 	const location = useLocation();
+	const navigate = useNavigate();
 	const { user, loadingUser } = useUser();
 	const [notifications, setNotifications] = useState([]);
 	const [hasNewNotif, setHasNewNotif] = useState(false);
@@ -34,12 +46,31 @@ export default function MitraLayout({ children }) {
 				const count = data.unread_count || 0;
 
 				// Kalau jumlah belum-dibaca bertambah sejak polling terakhir,
-				// ada notifikasi baru -> tampilkan popup singkat + suara + getar.
+				// ada notifikasi baru -> ambil isi notifikasi TERBARU yang
+				// sebenarnya (title/message/category/link dari backend),
+				// bukan teks generik hardcoded. Ini yang bikin popup dulu
+				// selalu bilang "Order Baru" walau isinya soal refund/SOS/dll.
 				if (previousCount !== null && count > previousCount) {
-					setPopupNotif({
-						message: "Kamu punya notifikasi baru",
-						orderId: null,
-					});
+					try {
+						const notifRes = await fetch("http://127.0.0.1:8000/api/notifications", {
+							headers: { Authorization: `Bearer ${token}` },
+						});
+						const notifList = await notifRes.json();
+						const latest = Array.isArray(notifList) ? notifList[0] : null;
+
+						setPopupNotif(
+							latest
+								? {
+										title: latest.title,
+										message: latest.message,
+										category: latest.category,
+										link: latest.link,
+									}
+								: { title: "Notifikasi Baru", message: "Kamu punya notifikasi baru", category: "system", link: null }
+						);
+					} catch (e) {
+						setPopupNotif({ title: "Notifikasi Baru", message: "Kamu punya notifikasi baru", category: "system", link: null });
+					}
 
 					setTimeout(() => {
 						setPopupNotif(null);
@@ -192,31 +223,49 @@ export default function MitraLayout({ children }) {
 				{/* ================= MOBILE POPUP NOTIFICATION ================= */}
 				{popupNotif && (
 					<div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-sm animate-in slide-in-from-top-5 fade-in duration-300">
-						<div className="relative overflow-hidden rounded-3xl border border-white/20 bg-white/90 backdrop-blur-xl shadow-2xl">
+						<div
+							className={`relative overflow-hidden rounded-3xl border border-white/20 bg-white/90 backdrop-blur-xl shadow-2xl ${popupNotif.link ? "cursor-pointer" : ""}`}
+							onClick={() => {
+								if (popupNotif.link) {
+									navigate(popupNotif.link);
+									setPopupNotif(null);
+								}
+							}}
+						>
 							{/* Glow Background */}
 							<div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-violet-500/5 to-cyan-500/10"></div>
 
 							<div className="relative p-4 flex items-start gap-3">
-								{/* ICON */}
-								<div className="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center shrink-0">
-									<Bike className="text-indigo-700" size={22} />
-								</div>
+								{/* ICON (sesuai kategori notifikasi asli) */}
+								{(() => {
+									const style = getNotifStyle(popupNotif.category);
+									const Icon = style.icon;
+									return (
+										<div className={`w-12 h-12 rounded-2xl ${style.bg} flex items-center justify-center shrink-0`}>
+											<Icon className={style.color} size={22} />
+										</div>
+									);
+								})()}
 
 								{/* CONTENT */}
 								<div className="flex-1 min-w-0">
 									<div className="flex items-center gap-2">
-										<p className="text-sm font-black text-indigo-900">Order Baru</p>
+										<p className="text-sm font-black text-indigo-900">{popupNotif.title}</p>
 
 										<div className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wide">Realtime</div>
 									</div>
 
 									<p className="text-xs text-gray-500 mt-1 leading-relaxed">{popupNotif.message}</p>
-
-									{popupNotif.orderId && <p className="text-[11px] text-indigo-500 font-bold mt-2">Order #{popupNotif.orderId}</p>}
 								</div>
 
 								{/* CLOSE */}
-								<button onClick={() => setPopupNotif(null)} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center transition-colors">
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										setPopupNotif(null);
+									}}
+									className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center transition-colors"
+								>
 									<X size={16} className="text-gray-400" />
 								</button>
 							</div>

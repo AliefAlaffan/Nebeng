@@ -1,12 +1,24 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import PosMitraSidebar from "./PosMitraSidebar";
-import { Bell, ChevronDown, QrCode, X } from "lucide-react";
+import { Bell, ChevronDown, QrCode, X, Wallet, ShieldAlert, MessageSquareWarning, Info } from "lucide-react";
+
+// Ikon & warna popup disesuaikan dengan kategori notifikasi asli dari backend
+// (dulu selalu pakai ikon QR "Pesanan POS Masuk" walau isinya notifikasi lain).
+const NOTIF_CATEGORY_STYLE = {
+	order: { icon: QrCode, color: "text-[#0b2f83]", bg: "bg-blue-50" },
+	payment: { icon: Wallet, color: "text-emerald-600", bg: "bg-emerald-50" },
+	sos: { icon: ShieldAlert, color: "text-red-600", bg: "bg-red-50" },
+	complaint: { icon: MessageSquareWarning, color: "text-amber-600", bg: "bg-amber-50" },
+	system: { icon: Info, color: "text-gray-600", bg: "bg-gray-100" },
+};
+const getNotifStyle = (category) => NOTIF_CATEGORY_STYLE[category] || NOTIF_CATEGORY_STYLE.system;
 
 export default function PosMitraLayout({ children }) {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [isScrolled, setIsScrolled] = useState(false);
 	const location = useLocation();
+	const navigate = useNavigate();
 	const [user, setUser] = useState(null);
 	const [loadingUser, setLoadingUser] = useState(true);
 	const [notifications, setNotifications] = useState([]);
@@ -73,10 +85,26 @@ export default function PosMitraLayout({ children }) {
 				const count = data.unread_count || 0;
 
 				if (previousCount !== null && count > previousCount) {
-					setPopupNotif({
-						message: "Kamu punya notifikasi baru",
-						orderId: null,
-					});
+					try {
+						const notifRes = await fetch("http://127.0.0.1:8000/api/notifications", {
+							headers: { Authorization: `Bearer ${token}` },
+						});
+						const notifList = await notifRes.json();
+						const latest = Array.isArray(notifList) ? notifList[0] : null;
+
+						setPopupNotif(
+							latest
+								? {
+										title: latest.title,
+										message: latest.message,
+										category: latest.category,
+										link: latest.link,
+									}
+								: { title: "Notifikasi Baru", message: "Kamu punya notifikasi baru", category: "system", link: null }
+						);
+					} catch (e) {
+						setPopupNotif({ title: "Notifikasi Baru", message: "Kamu punya notifikasi baru", category: "system", link: null });
+					}
 
 					setTimeout(() => {
 						setPopupNotif(null);
@@ -217,22 +245,41 @@ export default function PosMitraLayout({ children }) {
 				{/* ================= REAL-TIME POPUP NOTIFICATION ================= */}
 				{popupNotif && (
 					<div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-sm animate-in slide-in-from-top-5 fade-in duration-300">
-						<div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
+						<div
+							className={`relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl ${popupNotif.link ? "cursor-pointer" : ""}`}
+							onClick={() => {
+								if (popupNotif.link) {
+									navigate(popupNotif.link);
+									setPopupNotif(null);
+								}
+							}}
+						>
 							<div className="p-4 flex items-start gap-3">
-								<div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0b2f83] flex items-center justify-center shrink-0">
-									<QrCode size={20} />
-								</div>
+								{(() => {
+									const style = getNotifStyle(popupNotif.category);
+									const Icon = style.icon;
+									return (
+										<div className={`w-10 h-10 rounded-xl ${style.bg} ${style.color} flex items-center justify-center shrink-0`}>
+											<Icon size={20} />
+										</div>
+									);
+								})()}
 
 								<div className="flex-1 min-w-0">
 									<div className="flex items-center gap-2">
-										<p className="text-xs font-bold text-gray-900">Pesanan POS Masuk</p>
+										<p className="text-xs font-bold text-gray-900">{popupNotif.title}</p>
 										<div className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-bold uppercase tracking-wide">Baru</div>
 									</div>
 									<p className="text-xs text-gray-500 mt-1 leading-relaxed">{popupNotif.message}</p>
-									{popupNotif.orderId && <p className="text-[10px] text-[#0b2f83] font-semibold mt-1.5">ID Transaksi #{popupNotif.orderId}</p>}
 								</div>
 
-								<button onClick={() => setPopupNotif(null)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors">
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										setPopupNotif(null);
+									}}
+									className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+								>
 									<X size={14} className="text-gray-400" />
 								</button>
 							</div>
