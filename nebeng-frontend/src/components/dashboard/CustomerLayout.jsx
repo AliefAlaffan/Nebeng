@@ -1,19 +1,65 @@
-import { useState, useEffect } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import CustomerSidebar from "./CustomerSidebar";
-import { Menu, Bell, Search, ChevronDown } from "lucide-react";
+import { Menu, Bell, Search, ChevronDown, X, Bike, Wallet, ShieldAlert, MessageSquareWarning, Info } from "lucide-react";
 import { useUser } from "../../context/UserContext";
+
+// Ikon & warna popup disesuaikan dengan kategori notifikasi asli dari backend.
+const NOTIF_CATEGORY_STYLE = {
+	order: { icon: Bike, color: "text-indigo-700", bg: "bg-indigo-100" },
+	payment: { icon: Wallet, color: "text-emerald-700", bg: "bg-emerald-100" },
+	sos: { icon: ShieldAlert, color: "text-red-700", bg: "bg-red-100" },
+	complaint: { icon: MessageSquareWarning, color: "text-amber-700", bg: "bg-amber-100" },
+	system: { icon: Info, color: "text-gray-700", bg: "bg-gray-100" },
+};
+const getNotifStyle = (category) => NOTIF_CATEGORY_STYLE[category] || NOTIF_CATEGORY_STYLE.system;
 
 export default function CustomerLayout({ children }) {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [isScrolled] = useState(false);
 	const location = useLocation();
+	const navigate = useNavigate();
 	const { user, loadingUser } = useUser();
 	const [notifications, setNotifications] = useState([]);
 	const [hasNewNotif, setHasNewNotif] = useState(false);
+	const [popupNotif, setPopupNotif] = useState(null);
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
+	const notificationSound = useRef(null);
 
 	useEffect(() => {
+		const audio = new Audio("/notification.mp3");
+		audio.preload = "auto";
+		audio.volume = 1;
+		notificationSound.current = audio;
+
+		const unlockAudio = async () => {
+			try {
+				await audio.play();
+				audio.pause();
+				audio.currentTime = 0;
+			} catch (err) {
+				// butuh interaksi user dulu sebelum browser mengizinkan audio - wajar, diabaikan
+			}
+		};
+
+		const handleFirstInteraction = () => {
+			unlockAudio();
+			window.removeEventListener("pointerdown", handleFirstInteraction);
+			window.removeEventListener("keydown", handleFirstInteraction);
+		};
+
+		window.addEventListener("pointerdown", handleFirstInteraction);
+		window.addEventListener("keydown", handleFirstInteraction);
+
+		return () => {
+			window.removeEventListener("pointerdown", handleFirstInteraction);
+			window.removeEventListener("keydown", handleFirstInteraction);
+		};
+	}, []);
+
+	useEffect(() => {
+		let previousCount = null;
+
 		const fetchUnreadCount = async () => {
 			try {
 				const token = localStorage.getItem("token");
@@ -24,9 +70,44 @@ export default function CustomerLayout({ children }) {
 				});
 
 				const data = await res.json();
+				const count = data.unread_count || 0;
 
-				setNotifications(new Array(data.unread_count || 0).fill(true));
-				setHasNewNotif((data.unread_count || 0) > 0);
+				// Kalau jumlah belum-dibaca bertambah, ambil isi notifikasi TERBARU
+				// yang sesungguhnya (title/message/category/link), bukan teks generik.
+				if (previousCount !== null && count > previousCount) {
+					try {
+						const notifRes = await fetch("http://127.0.0.1:8000/api/notifications", {
+							headers: { Authorization: `Bearer ${token}` },
+						});
+						const notifList = await notifRes.json();
+						const latest = Array.isArray(notifList) ? notifList[0] : null;
+
+						setPopupNotif(
+							latest
+								? { title: latest.title, message: latest.message, category: latest.category, link: latest.link }
+								: { title: "Notifikasi Baru", message: "Kamu punya notifikasi baru", category: "system", link: null }
+						);
+					} catch (e) {
+						setPopupNotif({ title: "Notifikasi Baru", message: "Kamu punya notifikasi baru", category: "system", link: null });
+					}
+
+					setTimeout(() => setPopupNotif(null), 4000);
+
+					if (notificationSound.current) {
+						try {
+							notificationSound.current.currentTime = 0;
+							notificationSound.current.play();
+						} catch (err) {
+							// diabaikan - browser mungkin belum unlock audio
+						}
+					}
+
+					if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+				}
+
+				previousCount = count;
+				setNotifications(new Array(count).fill(true));
+				setHasNewNotif(count > 0);
 			} catch (err) {
 				console.error("Fetch unread notif count error:", err);
 			}
@@ -55,6 +136,57 @@ export default function CustomerLayout({ children }) {
 	return (
 		// Hapus overflow-x-hidden di sini jika sticky masih bermasalah
 		<div className="flex min-h-screen bg-[#F8FAFC] font-sans">
+			{/* ================= POPUP NOTIFICATION ================= */}
+			{popupNotif && (
+				<div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-sm animate-in slide-in-from-top-5 fade-in duration-300">
+					<div
+						className={`relative overflow-hidden rounded-3xl border border-white/20 bg-white/90 backdrop-blur-xl shadow-2xl ${popupNotif.link ? "cursor-pointer" : ""}`}
+						onClick={() => {
+							if (popupNotif.link) {
+								navigate(popupNotif.link);
+								setPopupNotif(null);
+							}
+						}}
+					>
+						<div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-violet-500/5 to-cyan-500/10"></div>
+
+						<div className="relative p-4 flex items-start gap-3">
+							{(() => {
+								const style = getNotifStyle(popupNotif.category);
+								const Icon = style.icon;
+								return (
+									<div className={`w-12 h-12 rounded-2xl ${style.bg} flex items-center justify-center shrink-0`}>
+										<Icon className={style.color} size={22} />
+									</div>
+								);
+							})()}
+
+							<div className="flex-1 min-w-0">
+								<div className="flex items-center gap-2">
+									<p className="text-sm font-black text-indigo-900">{popupNotif.title}</p>
+									<div className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wide">Baru</div>
+								</div>
+								<p className="text-xs text-gray-500 mt-1 leading-relaxed">{popupNotif.message}</p>
+							</div>
+
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									setPopupNotif(null);
+								}}
+								className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center transition-colors"
+							>
+								<X size={16} className="text-gray-400" />
+							</button>
+						</div>
+
+						<div className="h-1 bg-gray-100 overflow-hidden">
+							<div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 animate-[shrink_4s_linear_forwards]"></div>
+						</div>
+					</div>
+				</div>
+			)}
+
 			{/* Sidebar Component */}
 			<CustomerSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
