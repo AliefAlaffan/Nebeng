@@ -42,6 +42,17 @@ export default function DetailOrder() {
 		fetchTrip();
 	}, [tripId]);
 
+	// Sama seperti mapping berat di OrderBarang.jsx / backend - dipakai
+	// untuk menghitung ulang harga proporsional trip barang di sini,
+	// supaya konsisten dengan yang tampil di halaman sebelumnya.
+	const capacityMap = {
+		xxs: 0.5,
+		xs: 1,
+		kecil: 5,
+		sedang: 10,
+		besar: 15,
+	};
+
 	const orderDetail = trip
 		? {
 				noPemesanan: `FR-${trip.id}`,
@@ -51,7 +62,15 @@ export default function DetailOrder() {
 				fromDetail: trip.origin_point.address,
 				to: trip.destination_point.city.name,
 				toDetail: trip.destination_point.address,
-				biaya: trip.price,
+
+				biaya: (() => {
+					if (type !== "barang") return trip.price;
+
+					const requestedWeight = capacityMap[barangState.size?.toLowerCase()] || capacityMap.xxs;
+					const tripCapacity = capacityMap[trip.baggage_capacity?.toLowerCase()] || trip.seat_total || requestedWeight;
+
+					return tripCapacity > 0 ? Math.round((trip.price / tripCapacity) * requestedWeight) : trip.price;
+				})(),
 
 				driver: {
 					nama: trip.mitra?.name || "Driver",

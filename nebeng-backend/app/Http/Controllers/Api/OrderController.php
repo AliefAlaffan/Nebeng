@@ -19,6 +19,28 @@ use Carbon\Carbon;
 
 class OrderController extends Controller
 {
+    // Konversi ukuran barang -> berat (kg). Sama persis dengan mapping di
+    // ItemOrderController & TripController, dipakai untuk menentukan
+    // berapa banyak seat_available yang harus dikurangi/dikembalikan
+    // untuk order barang (bukan selalu 1 seperti order penumpang).
+    private const CAPACITY_MAP = [
+        'xxs' => 0.5,
+        'xs' => 1,
+        'kecil' => 5,
+        'sedang' => 10,
+        'besar' => 15,
+    ];
+
+    // Order barang (punya item_order_id) -> kurangi/kembalikan sebesar
+    // berat barangnya (kg). Order penumpang biasa -> tetap 1 kursi.
+    private function capacityWeightForOrder(Order $order): float
+    {
+        if ($order->item_order_id && $order->itemOrder) {
+            return self::CAPACITY_MAP[$order->itemOrder->size] ?? 1;
+        }
+
+        return 1;
+    }
 
     public function store(Request $request)
     {
@@ -143,7 +165,7 @@ class OrderController extends Controller
             'payment_proof' => 'required|image|max:4096',
         ]);
 
-        $order = Order::with('trip.destinationPoint')->findOrFail($id);
+        $order = Order::with('trip.destinationPoint', 'itemOrder')->findOrFail($id);
 
         if ($order->customer_id !== auth()->id()) {
             return response()->json([
@@ -169,9 +191,14 @@ class OrderController extends Controller
             'status' => 'completed'
         ]);
 
+        // Order barang -> kurangi sebesar berat barangnya (kg).
+        // Order penumpang -> tetap 1 kursi seperti semula.
         $trip = $order->trip;
-        if ($trip && $trip->seat_available > 0) {
-            $trip->decrement('seat_available');
+        if ($trip) {
+            $amount = $this->capacityWeightForOrder($order);
+            if ($trip->seat_available >= $amount) {
+                $trip->decrement('seat_available', $amount);
+            }
         }
 
         broadcast(new NewOrderNotification($order));
@@ -213,7 +240,7 @@ class OrderController extends Controller
     // ================= MITRA: KONFIRMASI PEMBAYARAN SUDAH DITERIMA =================
     public function confirmPayment($id)
     {
-        $order = Order::with('trip')->findOrFail($id);
+        $order = Order::with('trip', 'itemOrder')->findOrFail($id);
 
         if (!$order->trip || $order->trip->mitra_id !== auth()->id()) {
             return response()->json([
@@ -237,7 +264,14 @@ class OrderController extends Controller
 
         if ($order->payment_method === 'cash' && $order->status !== 'completed') {
             $order->update(['status' => 'completed']);
-            $order->trip->decrement('seat_available');
+
+            // Order barang -> kurangi sebesar berat barangnya (kg).
+            // Order penumpang -> tetap 1 kursi seperti semula.
+            $amount = $this->capacityWeightForOrder($order);
+            if ($order->trip->seat_available >= $amount) {
+                $order->trip->decrement('seat_available', $amount);
+            }
+
             broadcast(new NewOrderNotification($order));
         }
 
@@ -306,7 +340,7 @@ class OrderController extends Controller
 
     public function cancelOrder(Request $request, $id)
     {
-        $order = Order::with('trip')->findOrFail($id);
+        $order = Order::with('trip', 'itemOrder')->findOrFail($id);
 
         // simpan dulu sebelum status order diubah — untuk tahu apakah kursi
         // sudah sempat "terpakai" (dikurangi) waktu order ini lunas dulu
@@ -335,9 +369,10 @@ class OrderController extends Controller
                 'cancelled_at' => $now,
             ]);
 
-            // KEMBALIKAN KURSI kalau sebelumnya sudah terpakai
+            // KEMBALIKAN KURSI/KAPASITAS kalau sebelumnya sudah terpakai
             if ($wasSeatReserved && $order->trip) {
-                $order->trip->increment('seat_available');
+                $amount = $this->capacityWeightForOrder($order);
+                $order->trip->increment('seat_available', $amount);
             }
 
             \App\Models\OrderQrSession::where('order_id', $id)->delete();
@@ -418,9 +453,10 @@ class OrderController extends Controller
             'cancelled_at' => $now,
         ]);
 
-        // KEMBALIKAN KURSI kalau sebelumnya sudah terpakai
+        // KEMBALIKAN KURSI/KAPASITAS kalau sebelumnya sudah terpakai
         if ($wasSeatReserved && $order->trip) {
-            $order->trip->increment('seat_available');
+            $amount = $this->capacityWeightForOrder($order);
+            $order->trip->increment('seat_available', $amount);
         }
 
         \App\Models\OrderQrSession::where('order_id', $id)->delete();

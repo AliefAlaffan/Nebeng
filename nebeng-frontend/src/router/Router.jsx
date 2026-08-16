@@ -472,13 +472,13 @@ function AppRouter() {
 			/>
 
 			<Route
-				path="/customer/upload-bukti-pembayaran/:orderId"
-				element={
-					<ProtectedRoute role="customer">
-						<UploadBuktiPembayaran />
-					</ProtectedRoute>
-				}
-			/>
+			path="/customer/upload-bukti-pembayaran/:orderId?"
+			element={
+				<ProtectedRoute role="customer">
+					<UploadBuktiPembayaran />
+				</ProtectedRoute>
+			}
+		/>
 
 			<Route
 				path="/customer/atur-pin"

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
 import { ChevronLeft, UploadCloud, Loader2, CheckCircle2, Clock, Trash2 } from "lucide-react";
 import SuccessPopup from "../../components/ui/SuccessPopup";
@@ -7,6 +7,28 @@ import SuccessPopup from "../../components/ui/SuccessPopup";
 export default function UploadBuktiPembayaran() {
 	const navigate = useNavigate();
 	const { orderId } = useParams();
+	const location = useLocation();
+
+	// Kalau tidak ada :orderId di URL, artinya order BELUM dibuat sama
+	// sekali - kita di "mode buat baru". Order/ItemOrder baru benar-benar
+	// dibuat di database nanti, tepat saat customer klik "Kirim Bukti
+	// Pembayaran" di bawah (lihat handleUpload).
+	const isCreationMode = !orderId;
+
+	// Data pesanan yang MASIH DI localStorage (belum tersimpan ke server),
+	// dibawa dari Pembayaran.jsx.
+	const [pendingOrder] = useState(() => {
+		if (!isCreationMode) return null;
+		const saved = localStorage.getItem("pending_order");
+		return saved ? JSON.parse(saved) : null;
+	});
+	// Foto barang (kalau order barang) dibawa lewat navigate state, bukan
+	// localStorage, karena File tidak bisa di-JSON.stringify.
+	const pendingImage = location.state?.image || null;
+
+	// Preview trip (buat nampilin QRIS mitra & total tagihan) SEBELUM
+	// order benar-benar ada - hanya dipakai di mode buat baru.
+	const [tripPreview, setTripPreview] = useState(null);
 
 	const [order, setOrder] = useState(null);
 	const [isFetching, setIsFetching] = useState(true);
@@ -19,6 +41,38 @@ export default function UploadBuktiPembayaran() {
 	const prevStatusRef = useRef(null);
 
 	useEffect(() => {
+		// =========================================
+		// MODE BUAT BARU - order belum ada, cuma perlu ambil preview trip
+		// (untuk QRIS mitra & total tagihan). Tidak ada polling status,
+		// karena belum ada order untuk dipantau.
+		// =========================================
+		if (isCreationMode) {
+			if (!pendingOrder) {
+				navigate("/customer/dashboard");
+				return;
+			}
+
+			const fetchTripPreview = async () => {
+				try {
+					const res = await fetch(`http://127.0.0.1:8000/api/trips/${pendingOrder.trip_id}`);
+					const data = await res.json();
+					setTripPreview(data);
+				} catch (err) {
+					console.error(err);
+				} finally {
+					setIsFetching(false);
+				}
+			};
+
+			fetchTripPreview();
+			return;
+		}
+
+		// =========================================
+		// MODE ORDER SUDAH ADA - perilaku asli: fetch order & auto-refresh
+		// berkala supaya begitu mitra konfirmasi pembayaran, halaman ini
+		// langsung update tanpa perlu reload manual.
+		// =========================================
 		const fetchOrder = async () => {
 			try {
 				const token = localStorage.getItem("token");
@@ -49,8 +103,6 @@ export default function UploadBuktiPembayaran() {
 
 		fetchOrder();
 
-		// Auto-refresh berkala supaya begitu mitra konfirmasi pembayaran,
-		// halaman ini langsung update tanpa perlu reload manual.
 		const interval = setInterval(fetchOrder, 4000);
 
 		return () => clearInterval(interval);
@@ -74,11 +126,76 @@ export default function UploadBuktiPembayaran() {
 
 		try {
 			const token = localStorage.getItem("token");
+			let targetOrderId = orderId;
 
+			// =========================================
+			// MODE BUAT BARU - order BELUM ada di database. Baru dibuat
+			// sekarang, tepat saat customer benar-benar mengirim bukti
+			// bayar (bukan sebelumnya).
+			// =========================================
+			if (isCreationMode) {
+				const isBarang = pendingOrder?.type === "barang";
+
+				let createRes;
+
+				if (isBarang) {
+					const createFormData = new FormData();
+
+					createFormData.append("trip_id", pendingOrder.trip_id);
+					createFormData.append("origin_point_id", pendingOrder.origin_point_id);
+					createFormData.append("destination_point_id", pendingOrder.destination_point_id);
+					createFormData.append("delivery_date", pendingOrder.delivery_date);
+					createFormData.append("size", pendingOrder.size || "");
+					createFormData.append("item_description", pendingOrder.item_description || "");
+					createFormData.append("payment_method", pendingOrder.payment_method);
+
+					if (pendingImage) {
+						createFormData.append("image", pendingImage);
+					}
+
+					createRes = await fetch("http://127.0.0.1:8000/api/item-orders", {
+						method: "POST",
+						headers: {
+							Authorization: `Bearer ${token}`,
+							Accept: "application/json",
+						},
+						body: createFormData,
+					});
+				} else {
+					createRes = await fetch("http://127.0.0.1:8000/api/orders", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Accept: "application/json",
+							Authorization: `Bearer ${token}`,
+						},
+						body: JSON.stringify({
+							trip_id: pendingOrder.trip_id,
+							pickup_address: pendingOrder.pickup_address,
+							drop_address: pendingOrder.drop_address,
+							payment_method: pendingOrder.payment_method,
+						}),
+					});
+				}
+
+				const createData = await createRes.json();
+
+				if (!createRes.ok) {
+					throw new Error(createData.message || "Gagal membuat pesanan");
+				}
+
+				targetOrderId = createData.order.id;
+			}
+
+			// =========================================
+			// UPLOAD BUKTI - sama untuk kedua mode, ke order yang baru
+			// saja dibuat (mode buat baru) atau order yang sudah ada
+			// sebelumnya (mode existing).
+			// =========================================
 			const formData = new FormData();
 			formData.append("payment_proof", file);
 
-			const res = await fetch(`http://127.0.0.1:8000/api/orders/${orderId}/upload-payment-proof`, {
+			const res = await fetch(`http://127.0.0.1:8000/api/orders/${targetOrderId}/upload-payment-proof`, {
 				method: "POST",
 				headers: { Authorization: `Bearer ${token}` },
 				body: formData,
@@ -90,6 +207,16 @@ export default function UploadBuktiPembayaran() {
 				throw new Error(data.message || "Gagal mengirim bukti pembayaran");
 			}
 
+			if (isCreationMode) {
+				localStorage.removeItem("pending_order");
+
+				// Ganti URL ke bentuk dengan orderId supaya kalau halaman
+				// ini di-refresh setelahnya, statusnya tetap bisa dipantau
+				// (masuk ke mode "order sudah ada" seperti biasa).
+				navigate(`/customer/upload-bukti-pembayaran/${targetOrderId}`, { replace: true });
+			}
+
+			setOrder(data.order);
 			setSubmitted(true);
 		} catch (err) {
 			alert(err.message || "Terjadi kesalahan saat mengirim bukti pembayaran");
@@ -97,6 +224,12 @@ export default function UploadBuktiPembayaran() {
 			setIsUploading(false);
 		}
 	};
+
+	// Sumber data tampilan: kalau order sudah benar-benar ada (submitted /
+	// mode existing) pakai `order`, kalau belum (mode buat baru, sebelum
+	// kirim bukti) pakai `tripPreview` + `pendingOrder`.
+	const displayPrice = order?.price ?? pendingOrder?.price ?? 0;
+	const qrisImage = order?.trip?.mitra?.profile?.qris_image ?? tripPreview?.mitra?.profile?.qris_image ?? null;
 
 	return (
 		<CustomerLayout>
@@ -147,15 +280,11 @@ export default function UploadBuktiPembayaran() {
 						{/* QRIS STATIS */}
 						<div className="bg-white rounded-[40px] p-8 shadow-sm border border-gray-100 text-center">
 							<p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Total Tagihan</p>
-							<p className="text-3xl font-black text-indigo-900 mb-6">Rp {Number(order?.price || 0).toLocaleString("id-ID")}</p>
+							<p className="text-3xl font-black text-indigo-900 mb-6">Rp {Number(displayPrice || 0).toLocaleString("id-ID")}</p>
 
 							{/* QRIS milik mitra untuk perjalanan ini */}
-							{order?.trip?.mitra?.profile?.qris_image ? (
-								<img
-									src={`http://127.0.0.1:8000/storage/${order.trip.mitra.profile.qris_image}`}
-									alt="QRIS Mitra"
-									className="w-56 h-56 mx-auto object-contain rounded-3xl border border-gray-100 bg-gray-50"
-								/>
+							{qrisImage ? (
+								<img src={`http://127.0.0.1:8000/storage/${qrisImage}`} alt="QRIS Mitra" className="w-56 h-56 mx-auto object-contain rounded-3xl border border-gray-100 bg-gray-50" />
 							) : (
 								<div className="w-56 h-56 mx-auto bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center gap-2">
 									<p className="text-xs font-bold text-gray-400 px-4 text-center">Mitra belum mengunggah QRIS. Hubungi mitra untuk metode pembayaran lain.</p>

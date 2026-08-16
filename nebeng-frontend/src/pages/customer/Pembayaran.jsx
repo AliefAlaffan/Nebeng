@@ -64,16 +64,39 @@ export default function Pembayaran() {
 		setIsProcessing(true);
 
 		try {
+			const paymentMethod = mapPaymentMethod(selectedMethod.id);
+
+			// =========================================
+			// QRIS/NONTUNAI - JANGAN buat order di sini.
+			// Order/ItemOrder baru benar-benar dibuat nanti di halaman
+			// upload bukti pembayaran, TEPAT saat customer klik "Kirim
+			// Bukti Pembayaran". Kalau customer berhenti di sini atau di
+			// halaman upload tanpa pernah kirim bukti, tidak ada apa pun
+			// yang tersimpan ke database - jadi tidak ada lagi pesanan
+			// "hantu" berstatus Dalam Proses padahal belum pernah dibayar.
+			// =========================================
+			if (selectedMethod.type === "nontunai") {
+				localStorage.setItem(
+					"pending_order",
+					JSON.stringify({ ...orderData, payment_method: paymentMethod })
+				);
+
+				navigate("/customer/upload-bukti-pembayaran", {
+					state: { image },
+				});
+				return;
+			}
+
+			// =========================================
+			// TUNAI - tidak ada langkah lanjutan, order langsung dibuat
+			// di sini seperti semula. Bayar tunai saat bertemu mitra,
+			// mitra yang konfirmasi penerimaan uang dari sisi mereka.
+			// =========================================
 			const token = localStorage.getItem("token");
 
 			let orderRes;
 
 			if (isBarang) {
-				// =========================================
-				// ORDER BARANG - baru dibuat di sini, saat customer
-				// benar-benar konfirmasi metode bayar. Ini yang membuat
-				// ItemOrder + Order sekaligus di backend.
-				// =========================================
 				const formData = new FormData();
 
 				formData.append("trip_id", orderData.trip_id);
@@ -82,7 +105,7 @@ export default function Pembayaran() {
 				formData.append("delivery_date", orderData.delivery_date);
 				formData.append("size", orderData.size || "");
 				formData.append("item_description", orderData.item_description || "");
-				formData.append("payment_method", mapPaymentMethod(selectedMethod.id));
+				formData.append("payment_method", paymentMethod);
 
 				if (image) {
 					formData.append("image", image);
@@ -108,7 +131,7 @@ export default function Pembayaran() {
 						trip_id: orderData.trip_id,
 						pickup_address: orderData.pickup_address,
 						drop_address: orderData.drop_address,
-						payment_method: mapPaymentMethod(selectedMethod.id),
+						payment_method: paymentMethod,
 						price: orderData.price,
 					}),
 				});
@@ -123,19 +146,12 @@ export default function Pembayaran() {
 			localStorage.removeItem("pending_order");
 			localStorage.removeItem("selected_payment_method");
 
-			if (selectedMethod.type === "nontunai") {
-				// QRIS dkk: lanjut upload bukti pembayaran
-				navigate(`/customer/upload-bukti-pembayaran/${orderResponse.order.id}`);
-			} else {
-				// Tunai: pesanan langsung jadi, bayar tunai saat bertemu mitra.
-				// Mitra akan konfirmasi penerimaan uang dari sisi mereka.
-				navigate("/customer/pembayaran-selesai", {
-					state: {
-						order: orderResponse.order,
-						method: selectedMethod.name,
-					},
-				});
-			}
+			navigate("/customer/pembayaran-selesai", {
+				state: {
+					order: orderResponse.order,
+					method: selectedMethod.name,
+				},
+			});
 		} catch (error) {
 			alert(error.message || "Terjadi kesalahan saat membuat pesanan");
 		} finally {

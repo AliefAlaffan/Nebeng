@@ -3,6 +3,7 @@ import { Toaster } from "react-hot-toast";
 import { UserProvider } from "./context/UserContext";
 
 function App() {
+	<Route path="/customer/upload-bukti-pembayaran/:orderId?" element={<UploadBuktiPembayaran />} />
 	return (
 		<UserProvider>
 			<Toaster

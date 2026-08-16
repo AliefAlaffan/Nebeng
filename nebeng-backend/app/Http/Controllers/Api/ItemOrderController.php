@@ -11,134 +11,176 @@ use App\Models\Order;
 
 class ItemOrderController extends Controller
 {
-    //
+    // Konversi ukuran barang -> berat (kg). Dipakai untuk menghitung harga
+    // proporsional & mengecek sisa kapasitas muatan trip. Sama persis
+    // dengan mapping yang dipakai di TripController saat trip dibuat.
+    private const CAPACITY_MAP = [
+        'xxs' => 0.5,
+        'xs' => 1,
+        'kecil' => 5,
+        'sedang' => 10,
+        'besar' => 15,
+    ];
+
     public function store(Request $request)
-{
-    $validated = $request->validate([
+    {
+        $validated = $request->validate([
 
-        'trip_id' => 'required|exists:trips,id',
+            'trip_id' => 'required|exists:trips,id',
 
-        'origin_point_id' =>
-            'required|exists:pickup_points,id',
+            'origin_point_id' =>
+                'required|exists:pickup_points,id',
 
-        'destination_point_id' =>
-            'required|exists:pickup_points,id',
+            'destination_point_id' =>
+                'required|exists:pickup_points,id',
 
-        'delivery_date' => 'required|date',
+            'delivery_date' => 'required|date',
 
-        'size' => 'required|in:dokumen,xxs,xs,kecil,sedang,besar',
+            'size' => 'required|in:dokumen,xxs,xs,kecil,sedang,besar',
 
-        'item_description' => 'nullable|string',
+            'item_description' => 'nullable|string',
 
-        'payment_method' =>
-            'required|in:cash,qris,ewallet',
+            'payment_method' =>
+                'required|in:cash,qris,ewallet',
 
-        'image' => 'nullable|image|max:2048'
-    ]);
+            'image' => 'nullable|image|max:2048'
+        ]);
 
-    // =========================
-    // UPLOAD IMAGE
-    // =========================
+        // =========================
+        // UPLOAD IMAGE
+        // =========================
 
-    $imagePath = null;
+        $imagePath = null;
 
-    if ($request->hasFile('image')) {
+        if ($request->hasFile('image')) {
 
-        $imagePath = $request
-            ->file('image')
-            ->store('item_images', 'public');
-    }
+            $imagePath = $request
+                ->file('image')
+                ->store('item_images', 'public');
+        }
 
-    // =========================
-    // AMBIL TRIP
-    // =========================
+        // =========================
+        // AMBIL TRIP
+        // =========================
 
-    $trip = Trip::with([
-        'originPoint',
-        'destinationPoint'
-    ])->findOrFail($validated['trip_id']);
+        $trip = Trip::with([
+            'originPoint',
+            'destinationPoint'
+        ])->findOrFail($validated['trip_id']);
 
-    // ==========================================
-    //PENCEGAHAN DUPLIKASI PESANAN (ANTI DOUBLE ORDER)
-    // ==========================================
-    $existingOrder = Order::where('trip_id', $trip->id)
-        ->where('customer_id', auth()->id())
-        ->whereIn('status', ['pending', 'completed'])
-        ->first();
+        // ==========================================
+        //PENCEGAHAN DUPLIKASI PESANAN (ANTI DOUBLE ORDER)
+        // ==========================================
+        $existingOrder = Order::where('trip_id', $trip->id)
+            ->where('customer_id', auth()->id())
+            ->whereIn('status', ['pending', 'completed'])
+            ->first();
 
-    if ($existingOrder) {
+        if ($existingOrder) {
+            return response()->json([
+                'message' => 'Anda sudah memiliki pesanan aktif pada trip ini.'
+            ], 400);
+        }
+
+        // ==========================================
+        // HITUNG BERAT & HARGA PROPORSIONAL
+        // ==========================================
+        // Kapasitas muatan trip barang itu SHARED antar customer (persis
+        // seperti kursi penumpang) - bukan sekali pesan langsung habis
+        // semua. Harga dihitung proporsional terhadap berat yang benar-
+        // benar dipesan customer ini dibanding kapasitas total yang
+        // ditawarkan mitra untuk trip ini.
+        //
+        // seat_available BELUM dikurangi di sini - baru dikurangi nanti
+        // saat pembayaran benar-benar dikonfirmasi (lihat
+        // OrderController@uploadPaymentProof / confirmPayment), supaya
+        // konsisten dengan alur penumpang.
+
+        $requestedWeight = self::CAPACITY_MAP[$validated['size']] ?? 0.5;
+
+        $tripCapacity = self::CAPACITY_MAP[$trip->baggage_capacity]
+            ?? ($trip->seat_total ?: $requestedWeight);
+
+        if ($trip->seat_available < $requestedWeight) {
+            return response()->json([
+                'message' => 'Sisa kapasitas muatan trip ini tidak mencukupi untuk ukuran barang yang dipilih.'
+            ], 400);
+        }
+
+        $itemPrice = $tripCapacity > 0
+            ? (int) round(($trip->price / $tripCapacity) * $requestedWeight)
+            : $trip->price;
+
+        // =========================
+        // CREATE ITEM ORDER
+        // =========================
+
+        $itemOrder = ItemOrder::create([
+
+            'user_id' => auth()->id(),
+
+            'origin_point_id' =>
+                $validated['origin_point_id'],
+
+            'destination_point_id' =>
+                $validated['destination_point_id'],
+
+            'delivery_date' =>
+                $validated['delivery_date'],
+
+            'size' => $validated['size'],
+
+            'item_description' =>
+                $validated['item_description'] ?? null,
+
+            'image' => $imagePath,
+
+            'status' => 'pending'
+        ]);
+
+        // =========================
+        // CREATE ORDER
+        // =========================
+
+        $order = Order::create([
+
+            'trip_id' => $trip->id,
+
+            'item_order_id' => $itemOrder->id,
+
+            'customer_id' => auth()->id(),
+
+            'pickup_address' =>
+                $trip->originPoint->address ?? 'Pickup Point',
+
+            'drop_address' =>
+                $trip->destinationPoint->address ?? 'Destination Point',
+
+            // Harga proporsional terhadap berat yang dipesan, BUKAN harga
+            // penuh trip lagi.
+            'price' => $itemPrice,
+
+            'payment_method' =>
+                $validated['payment_method'],
+
+            'status' => 'pending',
+
+            'payment_status' => 'unpaid',
+        ]);
+
         return response()->json([
-            'message' => 'Anda sudah memiliki pesanan aktif pada trip ini.'
-        ], 400);
+
+            'message' => 'Order barang berhasil dibuat',
+
+            'order' => $order->load([
+                'itemOrder',
+                'customer',
+                'trip'
+            ]),
+
+            'item_order' => $itemOrder
+
+        ]);
     }
-    // ==========================================
-
-    // =========================
-    // CREATE ITEM ORDER
-    // =========================
-
-    $itemOrder = ItemOrder::create([
-
-        'user_id' => auth()->id(),
-
-        'origin_point_id' =>
-            $validated['origin_point_id'],
-
-        'destination_point_id' =>
-            $validated['destination_point_id'],
-
-        'delivery_date' =>
-            $validated['delivery_date'],
-
-        'size' => $validated['size'],
-
-        'item_description' =>
-            $validated['item_description'] ?? null,
-
-        'image' => $imagePath,
-
-        'status' => 'pending'
-    ]);
-
-    // =========================
-    // CREATE ORDER
-    // =========================
-
-    $order = Order::create([
-
-        'trip_id' => $trip->id,
-
-        'item_order_id' => $itemOrder->id,
-
-        'customer_id' => auth()->id(),
-
-        'pickup_address' =>
-            $trip->originPoint->address ?? 'Pickup Point',
-
-        'drop_address' =>
-            $trip->destinationPoint->address ?? 'Destination Point',
-
-        'price' => $trip->price,
-
-        'payment_method' =>
-            $validated['payment_method'],
-
-        'status' => 'pending'
-    ]);
-
-    return response()->json([
-
-        'message' => 'Order barang berhasil dibuat',
-
-        'order' => $order->load([
-            'itemOrder',
-            'customer',
-            'trip'
-        ]),
-
-        'item_order' => $itemOrder
-
-    ]);
-}
     
 }

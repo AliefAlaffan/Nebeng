@@ -161,26 +161,41 @@ export default function OrderBarang() {
 					return allowed && enoughCapacity;
 				});
 
-				const formattedTrips = filteredTrips.map((trip) => ({
-					id: trip.id,
+				// Harga yang ditampilkan proporsional terhadap berat yang
+				// diminta customer (requestedWeight) dibanding kapasitas
+				// total yang ditawarkan mitra untuk trip ini - bukan harga
+				// penuh trip.price lagi. Backend (ItemOrderController)
+				// menghitung dengan rumus yang sama saat order dibuat,
+				// jadi angka yang tampil di sini seharusnya sudah sama
+				// dengan yang akan ditagihkan.
+				const formattedTrips = filteredTrips.map((trip) => {
+					const tripCapacity = sizeMap[trip.baggage_capacity?.toLowerCase()] || trip.seat_total || requestedWeight;
 
-					from: trip.origin_point.city.name,
-					fromPos: trip.origin_point.pos_name,
-					fromDetail: trip.origin_point.address,
+					const proportionalPrice = tripCapacity > 0 ? Math.round((trip.price / tripCapacity) * requestedWeight) : trip.price;
 
-					to: trip.destination_point.city.name,
-					toPos: trip.destination_point.pos_name,
-					toDetail: trip.destination_point.address,
+					return {
+						id: trip.id,
 
-					time: trip.departure_time,
-					date: trip.departure_date,
+						from: trip.origin_point.city.name,
+						fromPos: trip.origin_point.pos_name,
+						fromDetail: trip.origin_point.address,
 
-					price: trip.price,
+						to: trip.destination_point.city.name,
+						toPos: trip.destination_point.pos_name,
+						toDetail: trip.destination_point.address,
 
-					vehicle_type: trip.vehicle_type,
+						time: trip.departure_time,
+						date: trip.departure_date,
 
-					seat_available: trip.seat_available,
-				}));
+						price: proportionalPrice,
+
+						vehicle_type: trip.vehicle_type,
+
+						baggage_capacity: trip.baggage_capacity,
+
+						seat_available: trip.seat_available,
+					};
+				});
 
 				setRides(formattedTrips);
 			} catch (error) {
