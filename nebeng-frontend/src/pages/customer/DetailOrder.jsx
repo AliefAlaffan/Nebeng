@@ -15,9 +15,12 @@ export default function DetailOrder() {
 	const date = searchParams.get("date");
 	const backUrl = `/customer/order-${type}?origin_id=${origin_id}&destination_id=${destination_id}&date=${date}`;
 
-	// Data khusus pengiriman barang (size/description/image) yang dibawa dari
-	// OrderBarang.jsx lewat navigate state - belum ada order/item order yang
-	// dibuat sampai titik ini.
+	// size & description sengaja dibaca dari URL (searchParams), BUKAN dari
+	// location.state - karena state hilang kalau halaman ini di-refresh,
+	// sedangkan URL tetap utuh. Foto (image/preview) tetap dari state,
+	// karena File tidak bisa dititip lewat URL.
+	const barangSize = searchParams.get("size") || "";
+	const barangDescription = searchParams.get("description") || "";
 	const barangState = location.state || {};
 
 	const [isAgreed, setIsAgreed] = useState(false);
@@ -66,7 +69,7 @@ export default function DetailOrder() {
 				biaya: (() => {
 					if (type !== "barang") return trip.price;
 
-					const requestedWeight = capacityMap[barangState.size?.toLowerCase()] || capacityMap.xxs;
+					const requestedWeight = capacityMap[barangSize.toLowerCase()] || capacityMap.xxs;
 					const tripCapacity = capacityMap[trip.baggage_capacity?.toLowerCase()] || trip.seat_total || requestedWeight;
 
 					return tripCapacity > 0 ? Math.round((trip.price / tripCapacity) * requestedWeight) : trip.price;
@@ -121,8 +124,8 @@ export default function DetailOrder() {
 				origin_point_id: origin_id,
 				destination_point_id: destination_id,
 				delivery_date: date,
-				size: barangState.size,
-				item_description: barangState.description,
+				size: barangSize,
+				item_description: barangDescription,
 			}),
 		};
 

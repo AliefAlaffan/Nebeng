@@ -302,8 +302,8 @@ class OrderController extends Controller
 
         NotificationService::send(
             $mitraId,
-            'Saldo Bertambah',
-            'Rp' . number_format($order->price, 0, ',', '.') . " masuk ke saldo kamu dari order #{$order->id}.",
+            'Pendapatan Bertambah',
+            'Rp' . number_format($order->price, 0, ',', '.') . " masuk ke pendapatan kamu dari order #{$order->id}.",
             'payment',
             "/mitra/riwayat-saldo"
         );

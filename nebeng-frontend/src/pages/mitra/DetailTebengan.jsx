@@ -300,14 +300,15 @@ export default function DetailTebenganMitra() {
 
 					{(() => {
 						if (isBarang) {
-							const isFilled = (trip.seat_total ?? 0) - (trip.seat_available ?? 0) > 0;
+							const usedWeight = (trip.seat_total ?? 0) - (trip.seat_available ?? 0);
+							const remainingWeight = trip.seat_available ?? 0;
 
 							return (
 								<div className="space-y-5">
 									<div className="flex justify-between text-sm">
-										<span className="font-medium text-gray-400">Harga per Pengiriman</span>
+										<span className="font-medium text-gray-400">Harga per Kg</span>
 
-										<span className="font-black text-gray-800">Rp {Number(trip.price || 0).toLocaleString("id-ID")}</span>
+										<span className="font-black text-gray-800">Rp {Math.round((trip.price || 0) / (trip.seat_total || 1)).toLocaleString("id-ID")}</span>
 									</div>
 
 									<div className="flex justify-between text-sm">
@@ -317,13 +318,19 @@ export default function DetailTebenganMitra() {
 									</div>
 
 									<div className="flex justify-between text-sm">
-										<span className="font-medium text-gray-400">Status Muatan</span>
+										<span className="font-medium text-gray-400">Kapasitas Terisi</span>
 
-										<span className="font-black text-gray-800">{isFilled ? "Sudah Terisi" : "Masih Kosong"}</span>
+										<span className="font-black text-gray-800">{usedWeight} Kg</span>
+									</div>
+
+									<div className="flex justify-between text-sm">
+										<span className="font-medium text-gray-400">Kapasitas Tersisa</span>
+
+										<span className="font-black text-emerald-600">{remainingWeight} Kg</span>
 									</div>
 
 									<div className="pt-5 border-t-2 border-gray-100 flex justify-between items-center">
-										<span className="text-lg font-black text-indigo-900 uppercase tracking-widest">Potensi Pendapatan</span>
+										<span className="text-lg font-black text-indigo-900 uppercase tracking-widest">Potensi Pendapatan Maksimal</span>
 
 										<span className="text-2xl font-black text-emerald-500 tracking-tighter">Rp {Number(trip.price || 0).toLocaleString("id-ID")}</span>
 									</div>

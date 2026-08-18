@@ -421,17 +421,21 @@ export default function OrderBarang() {
 												onClick={() => {
 													// Belum membuat order apa pun di sini - cuma membawa
 													// data barang (ukuran, deskripsi, foto) ke halaman
-													// Detail Pesanan lewat state. Order/ItemOrder baru
-													// dibuat nanti di halaman Pembayaran setelah metode
-													// bayar dipilih & dikonfirmasi.
-													navigate(`/customer/detail-order/${ride.id}?type=barang&origin_id=${origin_id}&destination_id=${destination_id}&date=${date}`, {
-														state: {
-															image,
-															preview,
-															size,
-															description,
-														},
-													});
+													// Detail Pesanan. size & description sengaja ikut
+													// dimasukkan ke URL (bukan cuma state), supaya tahan
+													// kalau halaman Detail Pesanan di-refresh - state hilang
+													// saat refresh, URL tidak. Order/ItemOrder baru dibuat
+													// nanti di halaman Pembayaran setelah metode bayar
+													// dipilih & dikonfirmasi.
+													navigate(
+														`/customer/detail-order/${ride.id}?type=barang&origin_id=${origin_id}&destination_id=${destination_id}&date=${date}&size=${encodeURIComponent(size || "")}&description=${encodeURIComponent(description || "")}`,
+														{
+															state: {
+																image,
+																preview,
+															},
+														}
+													);
 												}}
 												className="w-full sm:w-auto inline-block px-10 py-4 bg-indigo-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-800 active:scale-95 transition-all text-center"
 											>

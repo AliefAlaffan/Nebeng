@@ -27,15 +27,25 @@ class TripController extends Controller
             'date' => 'required|date',
         ]);
 
-       $query = Trip::with([
+        $requestedDate = \Carbon\Carbon::parse($request->date)->toDateString();
+        $now = now();
+
+        $query = Trip::with([
             'originPoint.city',
             'destinationPoint.city',
             'mitra'
         ])
         ->where('origin_point_id', $request->origin_point_id)
         ->where('destination_point_id', $request->destination_point_id)
-        ->whereDate('departure_date', $request->date)
-        ->where('seat_available', '>', 0);
+        ->whereDate('departure_date', $requestedDate)
+        ->where('seat_available', '>', 0)
+        ->where('status', 'active');
+
+        // Kalau tanggal yang dicari adalah HARI INI, buang trip yang jam
+        // keberangkatannya sudah lewat dari waktu sekarang.
+        if ($requestedDate === $now->toDateString()) {
+            $query->where('departure_time', '>=', $now->toTimeString());
+        }
 
         // FILTER VEHICLE TYPE
         if (
@@ -60,7 +70,12 @@ class TripController extends Controller
         $trip = Trip::with([
             'originPoint.city',
             'destinationPoint.city',
-            'mitra',
+            // mitra.profile WAJIB ikut di-load - dipakai untuk menampilkan
+            // QRIS mitra di halaman preview pembayaran customer SEBELUM
+            // order dibuat (UploadBuktiPembayaran.jsx mode "buat baru").
+            // Tanpa ini, qris_image tidak pernah ikut ke response walau
+            // mitra sudah upload QRIS-nya.
+            'mitra.profile',
             'orders.user',
             'orders.itemOrder'
         ])->findOrFail($id);
@@ -894,9 +909,6 @@ class TripController extends Controller
 
         $sos = SosLog::create([
             'trip_id' => $trip->id,
-            // Kolom customer_id di tabel sos_logs bersifat NOT NULL (foreign key),
-            // tapi sebelumnya tidak pernah diisi di sini -> selalu gagal dengan
-            // SQL error "customer_id cannot be null" saat SOS dikirim.
             'customer_id' => $request->user()->id,
             'latitude' => $request->latitude,
             'longitude' => $request->longitude,
@@ -932,9 +944,6 @@ class TripController extends Controller
             'admin_notes' => $request->admin_notes,
             'status' => 'reviewed'
         ]);
-
-        // Opsional: Anda bisa mengirim notifikasi/pesan WhatsApp/broadcast ke mitra di sini
-        // Contoh: Notification::send($sos->trip->mitra, new MitraRebukeNotification($request->admin_notes));
 
         return response()->json([
             'success' => true,
