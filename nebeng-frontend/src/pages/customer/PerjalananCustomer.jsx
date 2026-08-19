@@ -102,7 +102,16 @@ export default function PerjalananCustomer() {
     const [justVerified, setJustVerified] = useState(false);
     const prevReadinessRef = useRef(null);
 
-    const order = trip?.orders?.[0];
+    // Customer yang sedang login - dipakai untuk cari order MILIKNYA SENDIRI
+    // di trip.orders, bukan selalu order pertama. Satu trip barang bisa
+    // dipesan banyak customer sekaligus, jadi trip.orders[0] bisa jadi
+    // milik orang lain, bukan milik customer yang sedang buka halaman ini.
+    const [currentUser] = useState(() => {
+        const userData = localStorage.getItem("user");
+        return userData ? JSON.parse(userData) : null;
+    });
+
+    const order = trip?.orders?.find((o) => o.customer_id === currentUser?.id) ?? trip?.orders?.[0];
 
     // Cek apakah customer sudah pernah lapor untuk order ini (kalau refund sedang berjalan)
     useEffect(() => {
@@ -211,7 +220,12 @@ export default function PerjalananCustomer() {
     const handleGenerateQR = async () => {
         try {
             const token = localStorage.getItem("token");
-            const orderId = trip?.orders?.[0]?.id;
+
+            // PENTING: pakai `order` (sudah difilter milik customer yang
+            // login), BUKAN trip.orders[0] lagi - supaya tiap customer
+            // generate QR untuk ORDER-nya SENDIRI, walaupun trip-nya sama
+            // dengan customer lain.
+            const orderId = order?.id;
 
             if (!orderId) {
                 alert("Order tidak ditemukan");
@@ -535,7 +549,7 @@ export default function PerjalananCustomer() {
                             </div>
                             <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Biaya</p>
-                                <p className="text-xl font-black text-indigo-900 mt-1">Rp {Number(trip.price || 0).toLocaleString("id-ID")}</p>
+                                <p className="text-xl font-black text-indigo-900 mt-1">Rp {Number(order?.price ?? trip.price ?? 0).toLocaleString("id-ID")}</p>
                             </div>
                         </div>
 

@@ -103,8 +103,46 @@ export default function KonfirmasiTebengan() {
 	useEffect(() => {
 		const fetchPreview = async () => {
 			try {
+				const isBarangOnly = tripData.tebengan_type === "Barang";
+				const isBarangDanTebengan = tripData.tebengan_type === "Barang dan Tebengan";
+
 				// ====================================
-				// PRICE PASSENGER
+				// TRIP BARANG MURNI
+				// vehicle_type di sini SUDAH "Barang-Motor"/"Barang-Mobil"
+				// (lihat NebengBarang.jsx) - WAJIB sertakan baggage_capacity,
+				// kalau tidak TripPricingService menghitung tanpa kapasitas
+				// dan hasilnya beda dari harga final yang tersimpan di trip.
+				// ====================================
+				if (isBarangOnly) {
+					const goodsRes = await fetch("http://127.0.0.1:8000/api/trips/preview", {
+						method: "POST",
+
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: "Bearer " + localStorage.getItem("token"),
+						},
+
+						body: JSON.stringify({
+							origin_point_id: tripData.origin_point_id,
+
+							destination_point_id: tripData.destination_point_id,
+
+							vehicle_type: tripData.vehicle_type,
+
+							baggage_capacity: tripData.baggage_capacity,
+						}),
+					});
+
+					const goodsData = await goodsRes.json();
+
+					setGoodsPrice(goodsData.estimated_price);
+
+					return;
+				}
+
+				// ====================================
+				// PRICE PASSENGER (trip penumpang, atau bagian penumpang
+				// dari "Barang dan Tebengan")
 				// ====================================
 
 				const passengerRes = await fetch("http://127.0.0.1:8000/api/trips/preview", {
@@ -132,7 +170,7 @@ export default function KonfirmasiTebengan() {
 				// JIKA BARANG & TEBENGAN
 				// ====================================
 
-				if (tripData.tebengan_type === "Barang dan Tebengan") {
+				if (isBarangDanTebengan) {
 					const goodsVehicleType = tripData.vehicle_type === "motor" ? "Barang-Motor" : "Barang-Mobil";
 					const goodsRes = await fetch("http://127.0.0.1:8000/api/trips/preview", {
 						method: "POST",
@@ -221,30 +259,45 @@ export default function KonfirmasiTebengan() {
 					<div className="lg:col-span-5">
 						<div className="bg-white rounded-[32px] p-8 shadow-xl border border-indigo-50 sticky top-6">
 							<div className="space-y-5 mb-8">
-								{/* PASSENGER PRICE */}
-
-								<div className="flex justify-between items-center">
-									<div>
-										<h4 className="text-lg font-black text-gray-800 leading-none">Tarif Tebengan</h4>
-
-										<p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Tarif per penumpang</p>
-									</div>
-
-									<span className="text-2xl font-black text-indigo-900 tracking-tighter">Rp {Number(passengerPrice || 0).toLocaleString("id-ID")}</span>
-								</div>
-
-								{/* GOODS PRICE */}
-
-								{tripData.tebengan_type === "Barang dan Tebengan" && (
-									<div className="flex justify-between items-center border-t pt-5">
+								{tripData.tebengan_type === "Barang" ? (
+									// TRIP BARANG MURNI
+									<div className="flex justify-between items-center">
 										<div>
-											<h4 className="text-lg font-black text-gray-800 leading-none">Tarif Barang</h4>
+											<h4 className="text-lg font-black text-gray-800 leading-none">Tarif Pengiriman</h4>
 
-											<p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Tarif pengiriman barang</p>
+											<p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Tarif untuk kapasitas penuh</p>
 										</div>
 
-										<span className="text-2xl font-black text-emerald-600 tracking-tighter">Rp {Number(goodsPrice || 0).toLocaleString("id-ID")}</span>
+										<span className="text-2xl font-black text-indigo-900 tracking-tighter">Rp {Number(goodsPrice || 0).toLocaleString("id-ID")}</span>
 									</div>
+								) : (
+									<>
+										{/* PASSENGER PRICE */}
+
+										<div className="flex justify-between items-center">
+											<div>
+												<h4 className="text-lg font-black text-gray-800 leading-none">Tarif Tebengan</h4>
+
+												<p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Tarif per penumpang</p>
+											</div>
+
+											<span className="text-2xl font-black text-indigo-900 tracking-tighter">Rp {Number(passengerPrice || 0).toLocaleString("id-ID")}</span>
+										</div>
+
+										{/* GOODS PRICE */}
+
+										{tripData.tebengan_type === "Barang dan Tebengan" && (
+											<div className="flex justify-between items-center border-t pt-5">
+												<div>
+													<h4 className="text-lg font-black text-gray-800 leading-none">Tarif Barang</h4>
+
+													<p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Tarif pengiriman barang</p>
+												</div>
+
+												<span className="text-2xl font-black text-emerald-600 tracking-tighter">Rp {Number(goodsPrice || 0).toLocaleString("id-ID")}</span>
+											</div>
+										)}
+									</>
 								)}
 							</div>
 

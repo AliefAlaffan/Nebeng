@@ -207,11 +207,22 @@ class TripController extends Controller
             // ====================================
             // GOODS VEHICLE TYPE
             // ====================================
+            // PENTING: vehicle_type yang dikirim BEDA tergantung asal form:
+            // - NebengBarang.jsx (trip barang murni) sudah mengirim string
+            //   "Barang-Motor"/"Barang-Mobil" langsung, BUKAN "motor"/"mobil"
+            //   polos. Kalau tetap dicek "=== 'motor'", perbandingan ini
+            //   selalu gagal dan salah jatuh ke "Barang-Mobil" (tarif lebih
+            //   mahal) walaupun kendaraannya Motor.
+            // - NebengMotor.jsx/NebengMobil.jsx (mode "Barang dan Tebengan")
+            //   mengirim vehicle_type mentah "motor"/"mobil", jadi masih
+            //   perlu di-mapping ke "Barang-Motor"/"Barang-Mobil".
 
             $goodsVehicleType =
-                $request->vehicle_type === 'motor'
-                    ? 'Barang-Motor'
-                    : 'Barang-Mobil';
+                str_starts_with($request->vehicle_type, 'Barang-')
+                    ? $request->vehicle_type
+                    : ($request->vehicle_type === 'motor'
+                        ? 'Barang-Motor'
+                        : 'Barang-Mobil');
 
             // ====================================
             // PRICE GOODS
@@ -851,6 +862,7 @@ class TripController extends Controller
             'token',
             $request->qr_token
         )
+        ->where('purpose', 'checkin')
         ->with('order')
         ->first();
 
@@ -895,6 +907,150 @@ class TripController extends Controller
             'message' => 'Customer berhasil diverifikasi',
             'order_id' => $session->order->id,
             'readiness_status' => 'ready'
+        ]);
+    }
+
+    // ================= MITRA: GENERATE QR PENGIRIMAN PER-ORDER =================
+    // Beda dengan scanQr() (arrival, per-TRIP, dampaknya ke semua order
+    // sekaligus) - QR ini khusus 1 order barang, supaya trip barang yang
+    // dipakai beberapa customer bisa dikonfirmasi kedatangan/pengiriman
+    // masing-masing secara independen.
+    public function generateDeliveryQr(Request $request, $orderId)
+    {
+        $order = Order::with('trip')->findOrFail($orderId);
+
+        if (!$order->trip || $order->trip->mitra_id !== auth()->id()) {
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+
+        if (!$order->item_order_id) {
+            return response()->json([
+                'message' => 'Fitur QR pengiriman ini khusus untuk order barang.'
+            ], 400);
+        }
+
+        if ($order->delivered_at) {
+            return response()->json([
+                'message' => 'Order ini sudah dikonfirmasi sampai sebelumnya.'
+            ], 400);
+        }
+
+        $token = \Illuminate\Support\Str::random(40);
+
+        $session = OrderQrSession::create([
+            'order_id' => $order->id,
+            'token' => $token,
+            'purpose' => 'delivery',
+            'expired_at' => now()->addMinutes(30),
+            'is_used' => false,
+        ]);
+
+        return response()->json([
+            'token' => $session->token,
+            'expired_at' => $session->expired_at,
+        ]);
+    }
+
+    // ================= SCAN QR PENGIRIMAN PER-ORDER =================
+    public function scanDeliveryQr(Request $request)
+    {
+        $validated = $request->validate([
+            'qr_token' => 'required|string'
+        ]);
+
+        $session = OrderQrSession::where('token', $request->qr_token)
+            ->where('purpose', 'delivery')
+            ->with('order.trip', 'order.customer')
+            ->first();
+
+        if (!$session) {
+            return response()->json([
+                'message' => 'QR tidak valid'
+            ], 404);
+        }
+
+        if (now()->gt($session->expired_at)) {
+            return response()->json([
+                'message' => 'QR sudah expired'
+            ], 400);
+        }
+
+        if ($session->is_used) {
+            return response()->json([
+                'message' => 'QR sudah digunakan'
+            ], 400);
+        }
+
+        $session->update([
+            'is_used' => true,
+            'used_at' => now(),
+        ]);
+
+        $order = $session->order;
+
+        // Cuma menandai ORDER INI - tidak menyentuh order lain di trip
+        // yang sama sekalipun trip-nya sama persis.
+        $order->update([
+            'delivered_at' => now(),
+        ]);
+
+        // ==========================================
+        // POIN REWARD - khusus customer order ini saja
+        // ==========================================
+        $customer = $order->customer;
+
+        if ($customer) {
+            $points = 20; // sama seperti poin barang di scanQr()
+
+            $customer->reward_points += $points;
+            $customer->save();
+
+            RewardTransaction::create([
+                'user_id' => $customer->id,
+                'type' => 'earn',
+                'points' => $points,
+                'description' => 'Poin dari barang sampai tujuan - order #' . $order->id,
+            ]);
+        }
+
+        NotificationService::send(
+            $order->customer_id,
+            'Barang Sudah Sampai',
+            'Barang kamu sudah dikonfirmasi sampai tujuan.' . ($customer ? " Kamu mendapat +20 poin reward!" : ''),
+            'trip',
+            "/customer/pesanan/{$order->id}"
+        );
+
+        // ==========================================
+        // Kalau SEMUA order di trip ini sudah delivered, baru trip
+        // ditandai selesai. Kalau masih ada yang belum, trip tetap
+        // berjalan menunggu order lain.
+        // ==========================================
+        $trip = $order->trip;
+
+        $stillPending = $trip->orders()
+            ->whereNotNull('item_order_id')
+            ->whereNull('delivered_at')
+            ->exists();
+
+        if (!$stillPending && $trip->status !== 'completed') {
+            $trip->update(['status' => 'completed']);
+
+            NotificationService::send(
+                $trip->mitra_id,
+                'Perjalanan Selesai',
+                'Semua barang di trip #' . $trip->id . ' sudah dikonfirmasi sampai.',
+                'trip',
+                "/mitra/riwayat"
+            );
+        }
+
+        return response()->json([
+            'message' => 'Barang berhasil dikonfirmasi sampai tujuan',
+            'order_id' => $order->id,
+            'trip_completed' => !$stillPending,
         ]);
     }
 
