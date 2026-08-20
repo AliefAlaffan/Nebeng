@@ -42,6 +42,26 @@ class OrderController extends Controller
         return 1;
     }
 
+    // Menentukan apakah kapasitas trip untuk order ini SUDAH terpakai
+    // (perlu dikembalikan kalau dibatalkan). Aturannya beda dua jenis
+    // order sekarang:
+    // - Order BARANG: kapasitas dikunci sejak order dibuat (booking-lock,
+    //   lihat ItemOrderController@store) - jadi selalu true, terlepas
+    //   dari status pembayaran/order-nya, SELAMA order ini belum pernah
+    //   dibatalkan sebelumnya (makanya cancelOrder() harus menolak
+    //   pembatalan ganda - lihat guard di awal method itu).
+    // - Order PENUMPANG: kursi baru terkunci setelah pembayaran
+    //   dikonfirmasi (status jadi 'completed') - perilaku lama, tidak
+    //   diubah.
+    private function wasCapacityReserved(Order $order): bool
+    {
+        if ($order->item_order_id) {
+            return true;
+        }
+
+        return $order->status === 'completed';
+    }
+
     public function store(Request $request)
     {
         $request->validate([
@@ -191,10 +211,12 @@ class OrderController extends Controller
             'status' => 'completed'
         ]);
 
-        // Order barang -> kurangi sebesar berat barangnya (kg).
-        // Order penumpang -> tetap 1 kursi seperti semula.
+        // Order barang: kapasitas SUDAH dikunci sejak order dibuat
+        // (lihat ItemOrderController@store) - jangan dikurangi lagi di
+        // sini, nanti dobel kurang.
+        // Order penumpang: kursi baru dikunci di sini, seperti semula.
         $trip = $order->trip;
-        if ($trip) {
+        if ($trip && !$order->item_order_id) {
             $amount = $this->capacityWeightForOrder($order);
             if ($trip->seat_available >= $amount) {
                 $trip->decrement('seat_available', $amount);
@@ -265,11 +287,18 @@ class OrderController extends Controller
         if ($order->payment_method === 'cash' && $order->status !== 'completed') {
             $order->update(['status' => 'completed']);
 
-            // Order barang -> kurangi sebesar berat barangnya (kg).
-            // Order penumpang -> tetap 1 kursi seperti semula.
-            $amount = $this->capacityWeightForOrder($order);
-            if ($order->trip->seat_available >= $amount) {
-                $order->trip->decrement('seat_available', $amount);
+            // Order barang: kapasitas SUDAH dikunci sejak order dibuat -
+            // tombol "Konfirmasi Tunai Diterima" sekarang murni soal
+            // pencatatan pendapatan, tidak lagi menyentuh kapasitas.
+            // Kalau mitra klik ini sebelum uang benar-benar diterima,
+            // dampaknya cuma salah catat pendapatan (bisa dikoreksi),
+            // bukan merusak data kapasitas trip.
+            // Order penumpang: kursi baru dikunci di sini, seperti semula.
+            if (!$order->item_order_id) {
+                $amount = $this->capacityWeightForOrder($order);
+                if ($order->trip->seat_available >= $amount) {
+                    $order->trip->decrement('seat_available', $amount);
+                }
             }
 
             broadcast(new NewOrderNotification($order));
@@ -342,9 +371,21 @@ class OrderController extends Controller
     {
         $order = Order::with('trip', 'itemOrder')->findOrFail($id);
 
-        // simpan dulu sebelum status order diubah — untuk tahu apakah kursi
-        // sudah sempat "terpakai" (dikurangi) waktu order ini lunas dulu
-        $wasSeatReserved = $order->status === 'completed';
+        // WAJIB: tolak kalau order ini sudah pernah dibatalkan sebelumnya.
+        // Sejak kapasitas order barang dikunci saat booking (bukan lagi
+        // saat status 'completed'), guard ini penting supaya pembatalan
+        // yang somehow terpanggil dua kali tidak mengembalikan kapasitas
+        // dua kali juga (double-refund).
+        if ($order->status === 'cancelled') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan ini sudah dibatalkan sebelumnya.'
+            ], 400);
+        }
+
+        // simpan dulu sebelum status order diubah — untuk tahu apakah
+        // kapasitas/kursi sudah sempat "terpakai" dan perlu dikembalikan
+        $wasSeatReserved = $this->wasCapacityReserved($order);
         
         $departureTime = Carbon::parse($order->trip->departure_date . ' ' . $order->trip->departure_time);
         $now = Carbon::now();

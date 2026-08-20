@@ -91,10 +91,8 @@ class ItemOrderController extends Controller
         // benar dipesan customer ini dibanding kapasitas total yang
         // ditawarkan mitra untuk trip ini.
         //
-        // seat_available BELUM dikurangi di sini - baru dikurangi nanti
-        // saat pembayaran benar-benar dikonfirmasi (lihat
-        // OrderController@uploadPaymentProof / confirmPayment), supaya
-        // konsisten dengan alur penumpang.
+        // seat_available dikunci (dikurangi) langsung setelah Order
+        // berhasil dibuat di bawah - lihat komentar "KUNCI KAPASITAS"
 
         $requestedWeight = self::CAPACITY_MAP[$validated['size']] ?? 0.5;
 
@@ -167,6 +165,22 @@ class ItemOrderController extends Controller
 
             'payment_status' => 'unpaid',
         ]);
+
+        // ==========================================
+        // KUNCI KAPASITAS SAAT INI JUGA (booking-lock)
+        // ==========================================
+        // Beda dengan order penumpang (yang baru mengunci kursi setelah
+        // pembayaran dikonfirmasi mitra), order barang mengunci kapasitas
+        // SEJAK order dibuat - baik tunai maupun QRIS. Ini supaya "sudah
+        // dipesan" dan "sudah dibayar" jadi dua hal yang jelas terpisah:
+        // begitu customer commit pesan, kapasitas langsung terpakai dan
+        // tidak bisa dobel-janji ke customer lain, terlepas dari kapan
+        // mitra sempat konfirmasi pembayarannya.
+        //
+        // Konsekuensinya: tombol "Konfirmasi Tunai Diterima" di sisi
+        // mitra (OrderController@confirmPayment) TIDAK LAGI menyentuh
+        // kapasitas - murni soal pencatatan pendapatan sekarang.
+        $trip->decrement('seat_available', $requestedWeight);
 
         return response()->json([
 
