@@ -12,13 +12,21 @@ class TripJourneyController extends Controller
     // =============================
     // GET JOURNEY DETAIL
     // =============================
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $trip = Trip::with([
             'originPoint',
             'destinationPoint',
             'mitra',
-            'orders'
+            'orders' => function ($query) use ($request) {
+                // WAJIB: filter ke order milik customer yang login saja.
+                // Trip ini bisa di-share banyak customer sekaligus (barang,
+                // atau nebeng motor/mobil dengan beberapa penumpang) -
+                // tanpa filter ini, customer A bisa melihat (dan bahkan
+                // tidak sengaja memicu aksi terhadap) data order customer B
+                // karena frontend mengambil order pertama dari list.
+                $query->where('customer_id', $request->user()->id);
+            },
         ])->findOrFail($id);
 
         $latestTracking = TripTracking::where('trip_id', $id)

@@ -1024,15 +1024,20 @@ class TripController extends Controller
         );
 
         // ==========================================
-        // Kalau SEMUA order di trip ini sudah delivered, baru trip
-        // ditandai selesai. Kalau masih ada yang belum, trip tetap
-        // berjalan menunggu order lain.
+        // Kalau SEMUA order barang di trip ini sudah delivered ATAU
+        // dibatalkan, baru trip ditandai selesai. Order yang sudah
+        // dibatalkan TIDAK BOLEH ikut dihitung "masih pending" - order
+        // itu tidak akan pernah punya delivered_at (memang tidak jadi
+        // dikirim), jadi tanpa pengecualian ini trip tidak akan pernah
+        // bisa selesai kalau salah satu customer di trip shared ini
+        // membatalkan pesanannya.
         // ==========================================
         $trip = $order->trip;
 
         $stillPending = $trip->orders()
             ->whereNotNull('item_order_id')
             ->whereNull('delivered_at')
+            ->where('status', '!=', 'cancelled')
             ->exists();
 
         if (!$stillPending && $trip->status !== 'completed') {

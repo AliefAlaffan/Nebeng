@@ -343,10 +343,20 @@ class OrderController extends Controller
         ]);
     }
 
-    public function markAsNoShow($id)
+    public function markAsNoShow(Request $request, $id)
     {
         try {
-            $order = \App\Models\Order::findOrFail($id);
+            $order = \App\Models\Order::with('trip')->findOrFail($id);
+
+            // WAJIB: pastikan order ini berada di trip milik mitra yang
+            // sedang login. Tanpa ini, mitra manapun bisa menandai order
+            // di trip milik MITRA LAIN sebagai tidak hadir.
+            if (!$order->trip || $order->trip->mitra_id !== $request->user()->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 403);
+            }
 
             $order->update([
                 'readiness_status' => 'no_show',
@@ -370,6 +380,18 @@ class OrderController extends Controller
     public function cancelOrder(Request $request, $id)
     {
         $order = Order::with('trip', 'itemOrder')->findOrFail($id);
+
+        // WAJIB: pastikan order ini benar-benar milik customer yang sedang
+        // login. Tanpa ini, customer manapun bisa membatalkan pesanan
+        // customer LAIN hanya dengan menebak/mengetahui order id -
+        // termasuk memicu penalti, proses refund, dan memotong saldo
+        // mitra untuk pesanan yang bukan miliknya.
+        if ($order->customer_id !== $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized'
+            ], 403);
+        }
 
         // WAJIB: tolak kalau order ini sudah pernah dibatalkan sebelumnya.
         // Sejak kapasitas order barang dikunci saat booking (bukan lagi

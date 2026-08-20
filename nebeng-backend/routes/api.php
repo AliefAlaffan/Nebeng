@@ -120,7 +120,13 @@ Route::get('/test-route', function (OSRMService $osrm) {
 });
 
 // Perjalanan Maps
-Route::get('/trips/{id}/journey', [TripJourneyController::class, 'show']);
+// WAJIB auth:sanctum: endpoint ini mengembalikan data order (harga,
+// status pembayaran, status refund) semua customer di trip tsb - kalau
+// publik/tanpa login, siapa pun bisa lihat data pesanan orang lain hanya
+// dengan menebak trip id di URL.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/trips/{id}/journey', [TripJourneyController::class, 'show']);
+});
 
 Route::post('/trips/{id}/tracking', [TripJourneyController::class, 'updateTracking']);
 
