@@ -33,7 +33,9 @@ class TripController extends Controller
         $query = Trip::with([
             'originPoint.city',
             'destinationPoint.city',
-            'mitra'
+            'mitra' => function ($q) {
+                $q->withAvg('reviewsAsMitra', 'rating')->withCount('reviewsAsMitra');
+            }
         ])
         ->where('origin_point_id', $request->origin_point_id)
         ->where('destination_point_id', $request->destination_point_id)

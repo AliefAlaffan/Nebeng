@@ -64,6 +64,7 @@ const Verification = lazy(() => import("../pages/customer/Verification"));
 const PerjalananCustomer = lazy(() => import("../pages/customer/PerjalananCustomer"));
 const DetailPesanan = lazy(() => import("../pages/customer/Pesanan"));
 const BeriRating = lazy(() => import("../pages/customer/BeriRating"));
+const MitraPublicProfile = lazy(() => import("../pages/customer/MitraProfile"));
 
 /* MITRA */
 const DashboardMitra = lazy(() => import("../pages/mitra/Dashboard"));
@@ -413,6 +414,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="customer">
 						<BeriRating />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/customer/mitra/:mitraId"
+				element={
+					<ProtectedRoute role="customer">
+						<MitraPublicProfile />
 					</ProtectedRoute>
 				}
 			/>

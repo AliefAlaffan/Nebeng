@@ -180,6 +180,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('auth:sanctum')->post('/trips/{trip}/review',[TripReviewController::class, 'store']);
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/trip-reviews', [TripReviewController::class, 'store']);
+        Route::get('/mitra/{id}/profile', [TripReviewController::class, 'mitraProfile']);
+        Route::get('/customers/{id}/reputation', [TripReviewController::class, 'customerReputation']);
     });
 
 Route::middleware('auth:sanctum')->post('/mitra/trips', [TripController::class, 'store']);

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Link, useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import CustomerLayout from "../../components/dashboard/CustomerLayout";
-import { ChevronLeft, ArrowRight, Navigation, Clock, Users, Filter, Search, CheckCircle2, Bike, Car, Plane, Ship, Train, Package, Truck } from "lucide-react";
+import { ChevronLeft, ArrowRight, Navigation, Clock, Users, Filter, Search, CheckCircle2, Bike, Car, Plane, Ship, Train, Package, Truck, Star } from "lucide-react";
 
 export default function OrderBarang() {
 	const [searchParams] = useSearchParams();
@@ -194,6 +194,11 @@ export default function OrderBarang() {
 						baggage_capacity: trip.baggage_capacity,
 
 						seat_available: trip.seat_available,
+
+						mitraId: trip.mitra?.id ?? null,
+						driver: trip.mitra?.name ?? "Mitra",
+						mitraRating: trip.mitra?.reviews_as_mitra_avg_rating ?? null,
+						mitraReviewCount: trip.mitra?.reviews_as_mitra_count ?? 0,
 					};
 				});
 
@@ -370,7 +375,7 @@ export default function OrderBarang() {
 							processedRides.map((ride) => (
 								<div key={ride.id} className="group bg-white rounded-4xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
 									<div className="p-8">
-										<div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
+										<div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
 											<div>
 												<p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">{ride.date}</p>
 												<p className="text-lg font-black text-indigo-900">{ride.time}</p>
@@ -389,6 +394,23 @@ export default function OrderBarang() {
 												</div>
 											</div>
 										</div>
+
+										{ride.mitraId && (
+											<Link
+												to={`/customer/mitra/${ride.mitraId}`}
+												className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-indigo-50 transition-all group/mitra"
+											>
+												<span className="text-xs font-bold text-gray-700 group-hover/mitra:text-indigo-900">{ride.driver}</span>
+												{ride.mitraRating ? (
+													<span className="flex items-center gap-1 text-xs font-black text-amber-600">
+														<Star size={12} className="fill-amber-400 text-amber-400" /> {ride.mitraRating}
+														<span className="text-[10px] text-gray-400 font-medium">({ride.mitraReviewCount})</span>
+													</span>
+												) : (
+													<span className="text-[10px] text-gray-400 font-bold uppercase">Belum ada rating</span>
+												)}
+											</Link>
+										)}
 
 										<div className="relative pl-8 space-y-8 mb-8">
 											<div className="absolute left-3.25 top-2.5 bottom-2.5 w-0.5 bg-dashed bg-gray-100"></div>

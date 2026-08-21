@@ -96,4 +96,16 @@ class User extends Authenticatable
     {
         return $this->hasMany(\App\Models\MitraVehicle::class);
     }
+
+    // Rating yang DITERIMA user ini sebagai mitra (dari customer)
+    public function reviewsAsMitra()
+    {
+        return $this->hasMany(\App\Models\TripReview::class, 'mitra_id')->where('type', 'customer_to_mitra');
+    }
+
+    // Rating yang DITERIMA user ini sebagai customer (dari mitra)
+    public function reviewsAsCustomer()
+    {
+        return $this->hasMany(\App\Models\TripReview::class, 'customer_id')->where('type', 'mitra_to_customer');
+    }
 }

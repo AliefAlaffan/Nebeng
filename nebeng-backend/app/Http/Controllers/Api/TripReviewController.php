@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Trip;
 use App\Models\TripReview;
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Services\NotificationService;
 
@@ -30,9 +31,17 @@ class TripReviewController extends Controller
         // =========================
         if (!$isMitra) {
 
+            // PENTING: uniqueness check WAJIB ikut menyertakan 'type'.
+            // Tanpa ini, baris rating dari arah customer->mitra akan
+            // dianggap "sudah ada" oleh pengecekan arah mitra->customer
+            // (dan sebaliknya) karena keduanya memakai kombinasi
+            // (trip_id, customer_id, mitra_id) yang SAMA - akibatnya
+            // begitu satu arah submit duluan, arah satunya permanen
+            // terkunci untuk trip yang sama.
             $existing = TripReview::where('trip_id', $trip->id)
                 ->where('customer_id', $authUser->id)
                 ->where('mitra_id', $trip->mitra_id)
+                ->where('type', 'customer_to_mitra')
                 ->first();
 
             if ($existing) {
@@ -45,6 +54,7 @@ class TripReviewController extends Controller
                 'trip_id' => $trip->id,
                 'customer_id' => $authUser->id,
                 'mitra_id' => $trip->mitra_id,
+                'type' => 'customer_to_mitra',
                 'rating' => $request->rating,
                 'review' => $request->review,
             ]);
@@ -72,6 +82,7 @@ class TripReviewController extends Controller
             $existing = TripReview::where('trip_id', $trip->id)
                 ->where('customer_id', $request->reviewed_user_id)
                 ->where('mitra_id', $authUser->id)
+                ->where('type', 'mitra_to_customer')
                 ->first();
 
             if ($existing) {
@@ -89,6 +100,8 @@ class TripReviewController extends Controller
                 // mitra reviewer
                 'mitra_id' => $authUser->id,
 
+                'type' => 'mitra_to_customer',
+
                 'rating' => $request->rating,
                 'review' => $request->review,
             ]);
@@ -105,6 +118,66 @@ class TripReviewController extends Controller
         return response()->json([
             'message' => 'Review berhasil dikirim',
             'data' => $review
+        ]);
+    }
+
+    // =========================
+    // PROFIL PUBLIK MITRA
+    // Dipakai customer untuk lihat reputasi mitra SEBELUM booking:
+    // rata-rata rating, jumlah trip selesai, dan ulasan terbaru.
+    // =========================
+    public function mitraProfile($mitraId)
+    {
+        $mitra = User::where('id', $mitraId)->where('role', 'mitra')->firstOrFail();
+
+        $reviews = TripReview::where('mitra_id', $mitraId)
+            ->where('type', 'customer_to_mitra')
+            ->with('customer:id,name,avatar')
+            ->latest()
+            ->get();
+
+        $totalTrips = Trip::where('mitra_id', $mitraId)
+            ->where('status', 'completed')
+            ->count();
+
+        return response()->json([
+            'mitra' => [
+                'id' => $mitra->id,
+                'name' => $mitra->name,
+                'avatar' => $mitra->avatar,
+            ],
+            'average_rating' => $reviews->count() > 0 ? round($reviews->avg('rating'), 1) : null,
+            'total_reviews' => $reviews->count(),
+            'total_trips_completed' => $totalTrips,
+            'reviews' => $reviews->take(20)->values(),
+        ]);
+    }
+
+    // =========================
+    // REPUTASI CUSTOMER (dilihat mitra/admin)
+    // Rata-rata rating yang diberikan mitra ke customer ini + jumlah
+    // ulasan, supaya mitra/admin bisa lihat rekam jejak customer
+    // (melengkapi sistem strike pembatalan mendadak yang sudah ada).
+    // =========================
+    public function customerReputation($customerId)
+    {
+        $customer = User::where('id', $customerId)->where('role', 'customer')->firstOrFail();
+
+        $reviews = TripReview::where('customer_id', $customerId)
+            ->where('type', 'mitra_to_customer')
+            ->with('mitra:id,name,avatar')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'customer' => [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'avatar' => $customer->avatar,
+            ],
+            'average_rating' => $reviews->count() > 0 ? round($reviews->avg('rating'), 1) : null,
+            'total_reviews' => $reviews->count(),
+            'reviews' => $reviews->take(20)->values(),
         ]);
     }
 }

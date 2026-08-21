@@ -10,6 +10,7 @@ class TripReview extends Model
         'trip_id',
         'customer_id',
         'mitra_id',
+        'type',
         'rating',
         'review',
     ];
