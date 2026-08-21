@@ -746,9 +746,9 @@ export default function PerjalananMitra() {
                                 </button>
                             )}
 
-                            {tripStatus === "completed" && customers.length > 0 && (
+                            {tripStatus === "completed" && customers.filter((c) => c.orderStatus !== 'cancelled').length > 0 && (
                                 <div className="space-y-3">
-                                    {customers.map((customer) => (
+                                    {customers.filter((c) => c.orderStatus !== 'cancelled').map((customer) => (
                                         <button
                                             key={customer.id}
                                             onClick={() => navigate(`/mitra/beri-rating/${tripId}/${customer.id}`)}

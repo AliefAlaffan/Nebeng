@@ -31,6 +31,22 @@ class TripReviewController extends Controller
         // =========================
         if (!$isMitra) {
 
+            // WAJIB: rating cuma boleh diberikan kalau perjalanan BENAR-BENAR
+            // sudah selesai DAN order milik customer ini tidak dibatalkan.
+            // Sebelumnya tidak ada pengecekan sama sekali - customer/mitra
+            // yang tahu URL halaman rating bisa memberi/menerima rating
+            // untuk trip yang batal atau bahkan belum berangkat, merusak
+            // keakuratan skor reputasi.
+            $myOrder = \App\Models\Order::where('trip_id', $trip->id)
+                ->where('customer_id', $authUser->id)
+                ->first();
+
+            if ($trip->status !== 'completed' || !$myOrder || $myOrder->status === 'cancelled') {
+                return response()->json([
+                    'message' => 'Rating hanya bisa diberikan setelah perjalanan selesai dan tidak dibatalkan.'
+                ], 400);
+            }
+
             // PENTING: uniqueness check WAJIB ikut menyertakan 'type'.
             // Tanpa ini, baris rating dari arah customer->mitra akan
             // dianggap "sudah ada" oleh pengecekan arah mitra->customer
@@ -77,6 +93,20 @@ class TripReviewController extends Controller
                 return response()->json([
                     'message' => 'Customer tujuan wajib dipilih'
                 ], 422);
+            }
+
+            // WAJIB: sama seperti arah customer->mitra - rating cuma boleh
+            // diberikan kalau trip sudah selesai DAN order customer yang
+            // direview tidak dibatalkan (mitra tidak boleh menilai
+            // customer yang pesanannya sendiri sudah batal).
+            $targetOrder = \App\Models\Order::where('trip_id', $trip->id)
+                ->where('customer_id', $request->reviewed_user_id)
+                ->first();
+
+            if ($trip->status !== 'completed' || !$targetOrder || $targetOrder->status === 'cancelled') {
+                return response()->json([
+                    'message' => 'Rating hanya bisa diberikan setelah perjalanan selesai dan pesanan customer tidak dibatalkan.'
+                ], 400);
             }
 
             $existing = TripReview::where('trip_id', $trip->id)
