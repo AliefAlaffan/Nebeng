@@ -579,13 +579,16 @@ export default function PerjalananMitra() {
                                         )}
 
                                         <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-4 min-w-0">
+                                            <button
+                                                onClick={() => navigate(`/mitra/customer/${customer.id}`)}
+                                                className="flex items-center gap-4 min-w-0 text-left hover:opacity-80 transition-opacity"
+                                            >
                                                 <img src={customer.photo} alt={customer.name} className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md shrink-0 bg-white" />
                                                 <div className="min-w-0">
                                                     <h2 className="font-black text-gray-800 text-base truncate">{customer.name}</h2>
                                                     <span className="inline-block mt-0.5 bg-indigo-900 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md">{customer.type}</span>
                                                 </div>
-                                            </div>
+                                            </button>
 
                                             <div className="shrink-0 flex items-center gap-2">
                                                 {/* TOMBOL TANDAI TIDAK HADIR */}

@@ -93,6 +93,7 @@ const KonfirmasiWithdrawPIN = lazy(() => import("../pages/mitra/KonfirmasiWithdr
 const VerificationMitra = lazy(() => import("../pages/mitra/Verification"));
 const PerjalananMitra = lazy(() => import("../pages/mitra/PerjalananMitra"));
 const BeriRatingMitra = lazy(() => import("../pages/mitra/BeriRatingMitra"));
+const CustomerProfileMitra = lazy(() => import("../pages/mitra/CustomerProfile"));
 
 // Pos Mitra
 const DashboardPosMitra = lazy(() => import("../pages/pos_mitra/Dashboard"));
@@ -687,6 +688,15 @@ function AppRouter() {
 				element={
 					<ProtectedRoute role="mitra">
 						<BeriRatingMitra />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route
+				path="/mitra/customer/:customerId"
+				element={
+					<ProtectedRoute role="mitra">
+						<CustomerProfileMitra />
 					</ProtectedRoute>
 				}
 			/>

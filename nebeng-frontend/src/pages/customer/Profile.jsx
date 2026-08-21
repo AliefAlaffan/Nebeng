@@ -15,7 +15,9 @@ import {
 	ChevronRight,
 	Camera,
 	KeyRound, // Ikon tambahan untuk Password
+	Star,
 } from "lucide-react";
+import axios from "../../api/axios";
 
 export default function Profile() {
 	const [user, setUser] = useState({
@@ -24,6 +26,7 @@ export default function Profile() {
 		phone: "",
 	});
 	const navigate = useNavigate();
+	const [ratingStats, setRatingStats] = useState(null);
 	const avatarUrl = user?.avatar ? `http://127.0.0.1:8000/storage/${user.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || "User"}`;
 
 	const accountMenu = [
@@ -75,6 +78,18 @@ export default function Profile() {
 		fetchProfile();
 	}, []);
 
+	// Ambil skor reputasi customer sendiri (rata-rata rating dari mitra),
+	// supaya customer tahu skornya sendiri - sama seperti fitur di aplikasi
+	// ride-hailing lain.
+	useEffect(() => {
+		if (!user.id) return;
+
+		axios
+			.get(`/customers/${user.id}/reputation`)
+			.then((res) => setRatingStats(res.data))
+			.catch((err) => console.error("Gagal memuat skor Anda:", err));
+	}, [user.id]);
+
 	// ===============================
 	// LOGOUT
 	// ===============================
@@ -121,6 +136,16 @@ export default function Profile() {
 								</div>
 								<h2 className="text-2xl font-black tracking-tight mb-1">{user.name || "Loading..."}</h2>
 								<p className="text-indigo-200 text-sm font-medium">{user.email || ""}</p>
+
+								{ratingStats && (
+									<div className="flex items-center justify-center mt-4">
+										<div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-xl border border-white/20">
+											<Star size={14} className="fill-amber-400 text-amber-400" />
+											<span className="text-xs font-black text-white">{ratingStats.average_rating ?? "Baru"}</span>
+											{ratingStats.average_rating && <span className="text-[10px] text-indigo-200 font-bold">({ratingStats.total_reviews} rating dari mitra)</span>}
+										</div>
+									</div>
+								)}
 							</div>
 							<div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16"></div>
 							<div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -ml-12 -mb-12"></div>
