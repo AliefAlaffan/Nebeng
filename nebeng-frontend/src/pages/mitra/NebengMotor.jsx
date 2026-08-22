@@ -71,16 +71,16 @@ export default function TambahNebeng() {
 	];
 
 	const baggageOptions = [
-		{ id: "xxs", label: "XXS - Maksimal 0.5 Kg" },
-		{ id: "xs", label: "XS - Maksimal 1 Kg" },
-		{ id: "kecil", label: "Kecil - Maksimal 5 Kg" },
-		{ id: "sedang", label: "Sedang - Maksimal 10 Kg" },
-		{ id: "besar", label: "Besar - Maksimal 15 Kg" },
+		{ id: "XS", label: "XS - Maksimal 0.5 Kg" },
+		{ id: "S", label: "S - Maksimal 1 Kg" },
+		{ id: "M", label: "M - Maksimal 5 Kg" },
+		{ id: "L", label: "L - Maksimal 10 Kg" },
+		{ id: "XL", label: "XL - Maksimal 15 Kg" },
 	];
 
 	const filteredBaggageOptions = baggageOptions.filter((option) => {
 		// motor hanya support dokumen & kecil
-		return ["xxs", "xs", "kecil"].includes(option.id);
+		return ["XS", "S", "M"].includes(option.id);
 	});
 
 	const selectedBaggageLabel = filteredBaggageOptions.find((opt) => opt.id === baggageCapacity)?.label || "Pilih Kapasitas";

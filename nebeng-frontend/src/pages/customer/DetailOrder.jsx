@@ -48,12 +48,22 @@ export default function DetailOrder() {
 	// Sama seperti mapping berat di OrderBarang.jsx / backend - dipakai
 	// untuk menghitung ulang harga proporsional trip barang di sini,
 	// supaya konsisten dengan yang tampil di halaman sebelumnya.
+	// Mendukung DUA kosakata sekaligus: baru (XS/S/M/L/XL) & lama
+	// (xxs/xs/kecil/sedang/besar). JANGAN di-lowercase sebelum
+	// dicocokkan - "XS" (baru, 0.5kg) kalau di-lowercase jadi "xs" akan
+	// tabrakan sama kunci lama 'xs' (1kg).
 	const capacityMap = {
 		xxs: 0.5,
 		xs: 1,
 		kecil: 5,
 		sedang: 10,
 		besar: 15,
+
+		XS: 0.5,
+		S: 1,
+		M: 5,
+		L: 10,
+		XL: 15,
 	};
 
 	const orderDetail = trip
@@ -69,8 +79,8 @@ export default function DetailOrder() {
 				biaya: (() => {
 					if (type !== "barang") return trip.price;
 
-					const requestedWeight = capacityMap[barangSize.toLowerCase()] || capacityMap.xxs;
-					const tripCapacity = capacityMap[trip.baggage_capacity?.toLowerCase()] || trip.seat_total || requestedWeight;
+					const requestedWeight = capacityMap[barangSize] ?? 0.5;
+					const tripCapacity = capacityMap[trip.baggage_capacity] ?? trip.seat_total ?? requestedWeight;
 
 					return tripCapacity > 0 ? Math.round((trip.price / tripCapacity) * requestedWeight) : trip.price;
 				})(),
@@ -289,4 +299,4 @@ export default function DetailOrder() {
 			</div>
 		</CustomerLayout>
 	);
-}
+}	

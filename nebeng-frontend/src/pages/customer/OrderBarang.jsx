@@ -86,80 +86,39 @@ export default function OrderBarang() {
 				const data = await response.json();
 
 				// =====================================
-				// FILTER SIZE BARANG
-				// dokumen -> bisa semua
-				// kecil -> kecil sedang besar
-				// sedang -> sedang besar
-				// besar -> besar saja
+				// FILTER SIZE BARANG (murni angka kg, TIDAK bergantung
+				// kosakata/label). Mendukung dua kosakata sekaligus supaya
+				// tidak rusak kalau ada tempat lain yang masih kirim yang
+				// lama:
+				// - Baru (NebengBarang.jsx customer & mitra saat ini):
+				//   XS/S/M/L/XL
+				// - Lama: xxs/xs/kecil/sedang/besar
+				// PENTING: jangan di-lowercase sebelum dicocokkan - "XS"
+				// (baru, 0.5kg) kalau di-lowercase jadi "xs" akan tabrakan
+				// sama kunci lama 'xs' (1kg). Cocokkan persis huruf
+				// besar/kecilnya.
 				// =====================================
-
-				// =====================================
-				// FILTER SIZE BARANG
-				// =====================================
-
-				// ukuran request customer (kg minimum)
 				const sizeMap = {
+					// vocab lama
 					xxs: 0.5,
 					xs: 1,
 					kecil: 5,
 					sedang: 10,
 					besar: 15,
+					// vocab baru
+					XS: 0.5,
+					S: 1,
+					M: 5,
+					L: 10,
+					XL: 15,
 				};
 
-				const requestedWeight = sizeMap[size?.toLowerCase()] || 0.5;
+				const requestedWeight = sizeMap[size] ?? 0.5;
 
-				// kategori kapasitas trip
-				const getTripSizeCategory = (seat) => {
-					if (seat >= 15) return "besar";
-					if (seat >= 10) return "sedang";
-					if (seat >= 5) return "kecil";
-					if (seat >= 1) return "xs";
-
-					return "xxs";
-				};
-
-				const filteredTrips = data.filter((trip) => {
-					const tripSize = getTripSizeCategory(trip.seat_available);
-
-					// =====================================
-					// FILTER KATEGORI SIZE
-					// =====================================
-
-					let allowed = false;
-
-					switch (size?.toLowerCase()) {
-						case "xxs":
-							allowed = true;
-							break;
-
-						case "xs":
-							allowed = ["xs", "kecil", "sedang", "besar"].includes(tripSize);
-							break;
-
-						case "kecil":
-							allowed = ["kecil", "sedang", "besar"].includes(tripSize);
-							break;
-
-						case "sedang":
-							allowed = ["sedang", "besar"].includes(tripSize);
-							break;
-
-						case "besar":
-							allowed = ["besar"].includes(tripSize);
-							break;
-
-						default:
-							allowed = true;
-					}
-
-					// =====================================
-					// FILTER KAPASITAS REAL
-					// =====================================
-
-					const enoughCapacity = trip.seat_available >= requestedWeight;
-
-					return allowed && enoughCapacity;
-				});
+				// Filter murni berdasarkan angka kg - tidak perlu lagi
+				// kategori/label sama sekali, jadi aman dari perubahan
+				// kosakata di masa depan.
+				const filteredTrips = data.filter((trip) => trip.seat_available >= requestedWeight);
 
 				// Harga yang ditampilkan proporsional terhadap berat yang
 				// diminta customer (requestedWeight) dibanding kapasitas
@@ -169,7 +128,7 @@ export default function OrderBarang() {
 				// jadi angka yang tampil di sini seharusnya sudah sama
 				// dengan yang akan ditagihkan.
 				const formattedTrips = filteredTrips.map((trip) => {
-					const tripCapacity = sizeMap[trip.baggage_capacity?.toLowerCase()] || trip.seat_total || requestedWeight;
+					const tripCapacity = sizeMap[trip.baggage_capacity] ?? trip.seat_total ?? requestedWeight;
 
 					const proportionalPrice = tripCapacity > 0 ? Math.round((trip.price / tripCapacity) * requestedWeight) : trip.price;
 

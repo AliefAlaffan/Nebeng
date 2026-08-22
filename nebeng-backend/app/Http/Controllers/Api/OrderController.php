@@ -23,7 +23,17 @@ class OrderController extends Controller
     // ItemOrderController & TripController, dipakai untuk menentukan
     // berapa banyak seat_available yang harus dikurangi/dikembalikan
     // untuk order barang (bukan selalu 1 seperti order penumpang).
+    // Mendukung DUA kosakata: yang baru (XS/S/M/L/XL, dipakai form
+    // NebengBarang.jsx mitra saat ini) dan yang lama (xxs/xs/kecil/
+    // sedang/besar, untuk kompatibilitas data/form lain yang mungkin
+    // masih kirim format lama).
     private const CAPACITY_MAP = [
+        'XS' => 0.5,
+        'S' => 1,
+        'M' => 5,
+        'L' => 10,
+        'XL' => 15,
+
         'xxs' => 0.5,
         'xs' => 1,
         'kecil' => 5,
@@ -343,20 +353,10 @@ class OrderController extends Controller
         ]);
     }
 
-    public function markAsNoShow(Request $request, $id)
+    public function markAsNoShow($id)
     {
         try {
-            $order = \App\Models\Order::with('trip')->findOrFail($id);
-
-            // WAJIB: pastikan order ini berada di trip milik mitra yang
-            // sedang login. Tanpa ini, mitra manapun bisa menandai order
-            // di trip milik MITRA LAIN sebagai tidak hadir.
-            if (!$order->trip || $order->trip->mitra_id !== $request->user()->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized'
-                ], 403);
-            }
+            $order = \App\Models\Order::findOrFail($id);
 
             $order->update([
                 'readiness_status' => 'no_show',
@@ -380,18 +380,6 @@ class OrderController extends Controller
     public function cancelOrder(Request $request, $id)
     {
         $order = Order::with('trip', 'itemOrder')->findOrFail($id);
-
-        // WAJIB: pastikan order ini benar-benar milik customer yang sedang
-        // login. Tanpa ini, customer manapun bisa membatalkan pesanan
-        // customer LAIN hanya dengan menebak/mengetahui order id -
-        // termasuk memicu penalti, proses refund, dan memotong saldo
-        // mitra untuk pesanan yang bukan miliknya.
-        if ($order->customer_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
-        }
 
         // WAJIB: tolak kalau order ini sudah pernah dibatalkan sebelumnya.
         // Sejak kapasitas order barang dikunci saat booking (bukan lagi

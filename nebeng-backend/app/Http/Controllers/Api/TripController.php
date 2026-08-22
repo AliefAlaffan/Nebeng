@@ -33,9 +33,7 @@ class TripController extends Controller
         $query = Trip::with([
             'originPoint.city',
             'destinationPoint.city',
-            'mitra' => function ($q) {
-                $q->withAvg('reviewsAsMitra', 'rating')->withCount('reviewsAsMitra');
-            }
+            'mitra'
         ])
         ->where('origin_point_id', $request->origin_point_id)
         ->where('destination_point_id', $request->destination_point_id)
@@ -249,7 +247,20 @@ class TripController extends Controller
                 // KONVERSI KAPASITAS
                 // =========================
 
+                // PENTING: mendukung DUA kosakata sekaligus - yang baru
+                // (XS/S/M/L/XL, dipakai form NebengBarang.jsx mitra saat
+                // ini) dan yang lama (xxs/xs/kecil/sedang/besar, untuk
+                // kompatibilitas kalau ada tempat lain yang masih kirim
+                // format lama). Tanpa ini, baggage_capacity yang tidak
+                // dikenali diam-diam jatuh ke fallback 1kg - itu penyebab
+                // trip kapasitas M (5kg) malah tersimpan cuma 1kg.
                 $capacityMap = [
+
+                    'XS' => 0.5,
+                    'S' => 1,
+                    'M' => 5,
+                    'L' => 10,
+                    'XL' => 15,
 
                     'xxs' => 0.5,
                     'xs' => 1,
@@ -380,7 +391,15 @@ class TripController extends Controller
                 "Barang dan Tebengan"
             ) {
 
+                // Sama seperti mapping di atas - dukung vocab baru
+                // (XS/S/M/L/XL) & lama (xxs/xs/kecil/sedang/besar).
                 $capacityMap = [
+
+                    'XS' => 0.5,
+                    'S' => 1,
+                    'M' => 5,
+                    'L' => 10,
+                    'XL' => 15,
 
                     'xxs' => 0.5,
                     'xs' => 1,
@@ -1026,20 +1045,15 @@ class TripController extends Controller
         );
 
         // ==========================================
-        // Kalau SEMUA order barang di trip ini sudah delivered ATAU
-        // dibatalkan, baru trip ditandai selesai. Order yang sudah
-        // dibatalkan TIDAK BOLEH ikut dihitung "masih pending" - order
-        // itu tidak akan pernah punya delivered_at (memang tidak jadi
-        // dikirim), jadi tanpa pengecualian ini trip tidak akan pernah
-        // bisa selesai kalau salah satu customer di trip shared ini
-        // membatalkan pesanannya.
+        // Kalau SEMUA order di trip ini sudah delivered, baru trip
+        // ditandai selesai. Kalau masih ada yang belum, trip tetap
+        // berjalan menunggu order lain.
         // ==========================================
         $trip = $order->trip;
 
         $stillPending = $trip->orders()
             ->whereNotNull('item_order_id')
             ->whereNull('delivered_at')
-            ->where('status', '!=', 'cancelled')
             ->exists();
 
         if (!$stillPending && $trip->status !== 'completed') {

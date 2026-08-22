@@ -14,7 +14,17 @@ class ItemOrderController extends Controller
     // Konversi ukuran barang -> berat (kg). Dipakai untuk menghitung harga
     // proporsional & mengecek sisa kapasitas muatan trip. Sama persis
     // dengan mapping yang dipakai di TripController saat trip dibuat.
+    // Mendukung DUA kosakata: yang baru (XS/S/M/L/XL, dipakai form
+    // NebengBarang.jsx mitra saat ini) dan yang lama (xxs/xs/kecil/
+    // sedang/besar, untuk kompatibilitas data/form lain yang mungkin
+    // masih kirim format lama).
     private const CAPACITY_MAP = [
+        'XS' => 0.5,
+        'S' => 1,
+        'M' => 5,
+        'L' => 10,
+        'XL' => 15,
+
         'xxs' => 0.5,
         'xs' => 1,
         'kecil' => 5,
@@ -36,7 +46,7 @@ class ItemOrderController extends Controller
 
             'delivery_date' => 'required|date',
 
-            'size' => 'required|in:dokumen,xxs,xs,kecil,sedang,besar',
+            'size' => 'required|in:dokumen,xxs,xs,kecil,sedang,besar,XS,S,M,L,XL',
 
             'item_description' => 'nullable|string',
 

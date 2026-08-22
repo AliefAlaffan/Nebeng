@@ -18,14 +18,14 @@ function getStatusColor(status) {
 }
 
 // Sama seperti daftar opsi kapasitas di form "Tambah Nebeng Barang"
-// (NebengBarang.jsx) - dipakai supaya value mentah (xxs/xs/kecil/...)
+// (NebengBarang.jsx) - dipakai supaya value mentah (xxs/xs/S/...)
 // ditampilkan sebagai label yang enak dibaca, bukan kode singkatnya.
 const baggageCapacityLabels = {
-	xxs: "XXS - Maksimal 0.5 Kg",
-	xs: "XS - Maksimal 1 Kg",
-	kecil: "Kecil - Maksimal 5 Kg",
-	sedang: "Sedang - Maksimal 10 Kg",
-	besar: "Besar - Maksimal 15 Kg",
+	XS: "XS - Maksimal 0.5 Kg",
+	S: "S - Maksimal 1 Kg",
+	M: "M - Maksimal 5 Kg",
+	L: "L - Maksimal 10 Kg",
+	XL: "XL - Maksimal 15 Kg",
 };
 
 function formatBaggageCapacity(value) {
