@@ -119,14 +119,6 @@ export default function BeriRatingMitra() {
 		}
 	};
 
-	const formatRupiah = (angka) => {
-		return new Intl.NumberFormat("id-ID", {
-			style: "currency",
-			currency: "IDR",
-			maximumFractionDigits: 0,
-		}).format(angka);
-	};
-
 	return (
 		<MitraLayout>
 			<div className="w-full max-w-xl mx-auto px-4 py-6 space-y-6 font-sans pb-32">
@@ -137,7 +129,7 @@ export default function BeriRatingMitra() {
 					</button>
 					<div>
 						<h1 className="text-2xl font-black text-indigo-900 tracking-tight">Berikan Penilaian</h1>
-						<p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">Evaluasi Pendapatan & Pelanggan</p>
+						<p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">Evaluasi Pelanggan</p>
 					</div>
 				</div>
 
@@ -170,24 +162,6 @@ export default function BeriRatingMitra() {
 									<h3 className="font-black text-lg text-gray-800">{customer?.name || "Customer"}</h3>
 
 									<p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Customer Nebeng</p>
-								</div>
-							</div>
-
-							{/* RINCIAN PENDAPATAN CARD */}
-							<div className="bg-indigo-50/40 border border-indigo-50 rounded-3xl p-5 space-y-4">
-								<div>
-									<p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total Pendapatan</p>
-									<h2 className="text-3xl font-black text-indigo-900 tracking-tight mt-1">{formatRupiah(trip?.price || 0)}</h2>
-								</div>
-								<div className="border-t border-indigo-100/50 pt-3 space-y-2 text-xs font-bold">
-									<div className="flex justify-between text-gray-500">
-										<span>Biaya Pembayaran</span>
-										<span className="font-black text-gray-700">{formatRupiah(trip?.price || 0)}</span>
-									</div>
-									<div className="flex justify-between text-red-400">
-										<span>Biaya Admin</span>
-										<span className="font-black">-{formatRupiah((trip?.price || 0) * 0.1)}</span>
-									</div>
 								</div>
 							</div>
 
